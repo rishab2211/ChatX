@@ -1,6 +1,8 @@
 import { compare } from "bcrypt";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
+import { renameSync, unlinkSync } from "fs"
+
 
 // Maximum age of any session token created (3 days)
 const maxAge = 3 * 24 * 60 * 60 * 1000;
@@ -16,15 +18,15 @@ const createToken = (email, userId) => {
 export const signup = async (req, res, next) => {
   try {
     // destructuring the email and password object from request's body
-    const { email, password } = req.body;    
-    
+    const { email, password } = req.body;
+
     // if email or password not available
     if (!email || !password) {
       // sending status code 400(server is unable to process a request due to a client error)
-      
+
       return res.status(400).send("Email and Password is required");
     }
-    
+
     // Checking if the user already exist
     const existingUser = await User.findOne({ email });
 
@@ -123,21 +125,19 @@ export const login = async (req, res, next) => {
 
 export const getUserInfo = async (req, res, next) => {
   try {
-    console.log(req.userId);
+
     const userData = await User.findById(req.userId);
-    if(!userData){
+    if (!userData) {
       return res.status(404).send("User with the given ID not found.");
     }
-    
 
-  
     return res.status(200).json({
-      
-        id: userData.id,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        profileSetup: userData.profileSetup,
+
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      profileSetup: userData.profileSetup,
     });
   } catch (err) {
     console.log(err.message);
@@ -150,24 +150,24 @@ export const getUserInfo = async (req, res, next) => {
 export const updateProfile = async (req, res, next) => {
   try {
 
-    const {userId} = req;
-    const {firstName, lastName, color} = req.body;
+    const { userId } = req;
+    const { firstName, lastName, color } = req.body;
 
-    if(!firstName || !lastName){
-      return res.status(400).send("Firstname, lastname and color is required.");
+    if (!firstName || !lastName) {
+      return res.status(400).send("Firstname, lastname is required.");
     }
-    
-    const userData = await User.findByIdAndUpdate(userId,{
-      firstName, lastName, color, profileSetup:true
-    },{new:true, reValidators:true})
-  
+
+    const userData = await User.findByIdAndUpdate(userId, {
+      firstName, lastName, color, profileSetup: true
+    }, { new: true, reValidators: true })
+
     return res.status(200).json({
-      
-        id: userData.id,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        profileSetup: userData.profileSetup,
+
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      profileSetup: userData.profileSetup,
     });
   } catch (err) {
     // If something goes wrong
@@ -175,3 +175,29 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
+export const addProfileImage = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).send("File is required");
+    }
+
+
+    const date = Date.now();
+    let fileName = "upload/profiles" + data + req.file.originalname;
+    renameSync(req.file.path, fileName);
+
+    const updatedUser = await User.findByIdAndUpdate(req.userId, { image: fileName }, { new: true, runValidators: true });
+
+    return (res.status(200).json(
+      { image: updatedUser.image })
+    )
+  } catch (err) {
+
+  }
+};
+
+
+export const removeProfileImage = () => {
+
+
+}

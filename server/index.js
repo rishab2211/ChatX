@@ -55,3 +55,6 @@ mongoose
     console.log("DB connection successful!");
   })
   .catch((err) => console.log(err.message));
+
+
+  app.use("/uploads/profiles",express.static("uploads/profiles"))

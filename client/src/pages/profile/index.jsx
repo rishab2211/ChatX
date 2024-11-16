@@ -26,7 +26,7 @@ const ProfileIndex = () => {
       return false;
     }
     if (!lastName) {
-      toast.error("First name is required");
+      toast.error("Last name is required");
       return false;
     }
     return true;
@@ -42,7 +42,7 @@ const ProfileIndex = () => {
         );
 
         if(response.status==200 && response.data){
-          setUserInfo(response.data);
+          setUserInfo(...response.data);
           toast.success("Profile updated successfully");
           navigate("/chat");
         }
@@ -76,8 +76,17 @@ const ProfileIndex = () => {
     if(file){
       const formData = new FormData();
       formData.append("profile-image",file);
-      const response = await apiCLient.post(ADD_PROFILE_IMAGE_ROUTE,{formData},{withCredentials:true});
-
+      console.log("Add profile image route ke upr");
+      
+      const response = await apiCLient.post(ADD_PROFILE_IMAGE_ROUTE,
+        formData,
+        {withCredentials:true,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          }
+        });
+        console.log("image updated");
+        
       if(response.status==200 && response.data.image){
         setUserInfo({...userInfo, image:response.data.image});
         toast.success("Image updated successfully")
@@ -171,7 +180,7 @@ const ProfileIndex = () => {
                 <div className="w-full flex gap-5">
                   {colors.map((color, index) => (
                     <div
-                      className={` ${color} h-8 w-8 rounded-full cursor-pointer transition-all duration-300
+                      className={` ${color} h-8 w-8 rounded-full hover:cursor-pointer transition-all duration-300
                   ${
                     selectedColor === index ? "outline-white/50 outline-1" : ""
                   } `}

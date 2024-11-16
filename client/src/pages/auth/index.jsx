@@ -20,7 +20,8 @@ const AuthIndex = () => {
   // useNavigate instance 
   const navigate = useNavigate();
 
-  const {setUserInfo} = useAppStore();
+  const { setUserInfo } = useAppStore();
+
 
   // Validating signup and responding accordingly with toast notification
   const validateSignup = () => {
@@ -48,6 +49,40 @@ const AuthIndex = () => {
     return true;
   };
 
+
+  const handleSignup = async () => {
+
+    if (validateSignup()) {
+      try {
+        const response = await apiClient.post(
+          // If validation is successful then, sending POST request to this route
+          SIGNUP_ROUTE,
+          // Data
+          { email, password },
+          // Ensures cookies are included in the request
+          { withCredentials: true }
+        );
+        // notification on succsessful login
+        toast.success("Signup successful");
+        // Clear input fields
+        Ready();
+
+        if (response.status === 201) {
+          setUserInfo(response.data.user)
+          navigate("/profile");
+        }
+
+      } catch (error) {
+        // showing error mesage as toast notification
+        toast.error(error.message);
+
+      }
+
+    }
+
+  };
+
+
   // Validating signup and responding accordingly with toast notification
   const validateLogin = () => {
     // if email and password field is empty
@@ -70,40 +105,13 @@ const AuthIndex = () => {
   };
 
   // fn used when everytime user clicks login or signup tab button then it refeshes all the fields
-  function Ready(){
+  function Ready() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
   };
 
 
-
-  const handleSignup = async () => {
-    if (validateSignup()) {
-      try {
-        const response = await apiClient.post(
-          // If validation is successful then, sending POST request to this route
-          SIGNUP_ROUTE,
-          // Data
-          { email, password },
-          // Ensures cookies are included in the request
-          { withCredentials: true }
-        );
-        // notification on succsessful login
-        toast.success("Signup successful");
-        // Clear input fields
-        Ready();
-
-        if(response.status===201){
-          setUserInfo(response.data.user)
-          navigate("/profile");
-        }
-      } catch (error) {
-        // showing error mesage as toast notification
-        toast.error(error.message);
-      }
-    }
-  };
 
   const handleLogin = async () => {
     if (validateLogin()) {
@@ -121,19 +129,19 @@ const AuthIndex = () => {
         // Clear input fields
         Ready();
 
-        console.log("RESPONSE DATA : "+response.data);
-        console.log("RESPONSE DATA USER : "+response.data.user);
+        // console.log("RESPONSE DATA : "+response.data);
+        // console.log("RESPONSE DATA USER : "+response.data.user);
 
-        console.log("RESPONSE DATA USER EMAIL : "+response.data.user.email);
-        console.log("RESPONSE DATA USER ID : "+response.data.user.id);
-        console.log("RESPONSE DATA USER PROFILESETUP : "+response.data.user.profileSetup);
-        
-        
-        if(response.data.user){
+        // console.log("RESPONSE DATA USER EMAIL : "+response.data.user.email);
+        // console.log("RESPONSE DATA USER ID : "+response.data.user.id);
+        // console.log("RESPONSE DATA USER PROFILESETUP : "+response.data.user.profileSetup);
+
+
+        if (response.data.user) {
           setUserInfo(response.data.user);
-          if(response.data.user.profileSetup){
+          if (response.data.user.profileSetup) {
             navigate("/chat");
-          }else{
+          } else {
             navigate("/profile");
           }
         }
@@ -161,13 +169,13 @@ const AuthIndex = () => {
         {/* main fields and buttons div  */}
         <div className=" flex items-center justify-center w-full ">
           {/* login and signup tabs div */}
-          <Tabs className="w-3/4" defaultValue="login">
+          <Tabs className="w-3/4" defaultValue="login" onValueChange={Ready} >
             <TabsList className={`bg-transparent rounded-none w-full`}>
               {/* login tab */}
               <TabsTrigger
                 value="login"
                 className={` data-[state=active]:bg-transparent text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
-                onClick={Ready}
+                
               >
                 Login
               </TabsTrigger>
@@ -176,7 +184,7 @@ const AuthIndex = () => {
               <TabsTrigger
                 value="signup"
                 className={` data-[state=active]:bg-transparent text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
-                onClick={Ready}
+                
               >
                 Signup
               </TabsTrigger>
