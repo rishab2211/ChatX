@@ -138,6 +138,7 @@ export const getUserInfo = async (req, res, next) => {
       firstName: userData.firstName,
       lastName: userData.lastName,
       profileSetup: userData.profileSetup,
+      image:userData.image
     });
   } catch (err) {
     console.log(err.message);
@@ -181,9 +182,11 @@ export const addProfileImage = async (req, res, next) => {
       return res.status(400).send("File is required");
     }
 
+    console.log("File uploaded:", req.file.path);
+
 
     const date = Date.now();
-    let fileName = "upload/profiles" + data + req.file.originalname;
+    let fileName = "uploads/profiles/" + date + req.file.originalname;
     renameSync(req.file.path, fileName);
 
     const updatedUser = await User.findByIdAndUpdate(req.userId, { image: fileName }, { new: true, runValidators: true });
@@ -192,12 +195,31 @@ export const addProfileImage = async (req, res, next) => {
       { image: updatedUser.image })
     )
   } catch (err) {
-
+    console.log(err.message);
+    
   }
 };
 
 
-export const removeProfileImage = () => {
+export const removeProfileImage = async (req,res,next) => {
 
+  try{
+    const {userId} = req;
+    const  user =await User.findById(userId);
+
+    if(!user){
+      return res.status(404).send("User not found");
+    }
+
+    if(user.image){
+      unlinkSync(user.image);
+    }
+
+    user.image=null;
+    await user.save();
+  }catch(err){
+    console.log(err.message);
+    
+  }
 
 }

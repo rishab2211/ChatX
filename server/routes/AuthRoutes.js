@@ -9,7 +9,7 @@ import multer from "multer";
 
 // instance of Express router
 const authRoutes = Router();
-const upload = multer({ dest: "uploads/profiles" })
+const upload = multer({ dest: "uploads/profiles/" })
 // on /signup endpoint the signup logic will be used
 authRoutes.post("/signup", signup);
 // on /login endpoint the signup login will be used

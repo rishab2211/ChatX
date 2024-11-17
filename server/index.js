@@ -31,6 +31,11 @@ app.use(
   })
 );
 
+// app.use("/uploads/profiles",express.static("uploads/profiles"))
+
+app.use('/uploads/profiles', express.static('uploads/profiles'));
+
+
 // parsing incoming requests making them accessible via res.cookies
 app.use(cookieParser());
 
@@ -56,5 +61,3 @@ mongoose
   })
   .catch((err) => console.log(err.message));
 
-
-  app.use("/uploads/profiles",express.static("uploads/profiles"))

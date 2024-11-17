@@ -7,7 +7,7 @@ import { FaPlus, FaTrash } from "react-icons/fa";
 import { colors, getColor } from "../../lib/utils";
 import { toast } from "sonner";
 import apiCLient from "../../lib/api-client";
-import { ADD_PROFILE_IMAGE_ROUTE, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
+import { ADD_PROFILE_IMAGE_ROUTE, HOST, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
 const ProfileIndex = () => {
 
   const { userInfo, setUserInfo } = useAppStore();
@@ -41,8 +41,8 @@ const ProfileIndex = () => {
           { withCredentials: true }
         );
 
-        if(response.status==200 && response.data){
-          setUserInfo(...response.data);
+        if (response.status == 200 && response.data) {
+          setUserInfo(response.data);
           toast.success("Profile updated successfully");
           navigate("/chat");
         }
@@ -53,53 +53,70 @@ const ProfileIndex = () => {
     }
   };
 
-  useEffect(()=>{
-    if(userInfo.profileSetup){
+  useEffect(() => {
+    if (userInfo.profileSetup) {
       setFirstName(userInfo.firstName);
       setLastName(userInfo.lastName);
-      setSelectedColor(userInfo.color);
+      setSelectedColor(userInfo.color);  
+      console.log("userInfo.image : "+userInfo.image);
+      if(userInfo.image){
+        console.log("inside setImage");
+        
+        setImage(`${HOST}/${userInfo.image}`)
+      }
+      console.log("after setImage");
+      
+          
     }
-  },[userInfo]);
+    
+  }, [userInfo]);
 
-  const handleNavigate = ()=>{
-    if(userInfo.profileSetup){
+  const handleNavigate = () => {
+    if (userInfo.profileSetup) {
       navigate("/chat");
-    }else{
+    } else {
       toast.error("Please setup profile")
     }
   }
 
-  const handleChangeImage = async (event)=>{
+  const handleImageChange = async (event) => {
     const file = event.target.files[0];
-    console.log({file});
+    console.log({ file });
 
-    if(file){
+    if (file) {
       const formData = new FormData();
-      formData.append("profile-image",file);
+      formData.append("profile-image", file);
       console.log("Add profile image route ke upr");
-      
+
       const response = await apiCLient.post(ADD_PROFILE_IMAGE_ROUTE,
         formData,
-        {withCredentials:true,
+        {
+          withCredentials: true,
           headers: {
             'Content-Type': 'multipart/form-data',
           }
         });
-        console.log("image updated");
-        
-      if(response.status==200 && response.data.image){
-        setUserInfo({...userInfo, image:response.data.image});
+      console.log("image updated");
+
+      if (response.status == 200 && response.data.image) {
+        setUserInfo({ ...userInfo, image: response.data.image });
         toast.success("Image updated successfully")
       }
+
+      // const reader = new FileReader();
+      // reader.onload = ()=>{
+      //   setImage(reader.result);
+      // }
+      // reader.readAsDataURL(file);
     }
-    
-  }
-
-  const handleDeleteImage = async ()=>{
 
   }
 
-  const handleFileInputClick = ()=>{
+  const handleDeleteImage = async () => {
+
+  }
+
+  const handleFileInputClick = () => {
     fileInputRef.current.click();
   }
 
@@ -120,8 +137,8 @@ const ProfileIndex = () => {
                 {image ? (
                   <AvatarImage
                     src={image}
-                    alt="profile"
-                    className="object-cover w-full h-full bg-black"
+                    alt="profile-image"
+                    className=" object-cover w-full h-full "
                   />
                 ) : (
                   <div
@@ -137,15 +154,15 @@ const ProfileIndex = () => {
               </Avatar>
               {hovered && (
                 <div className=" absolute inset-0 flex items-center  justify-center bg-black/50 ring-fuchsia-50 rounded-full "
-                onClick={image?handleDeleteImage:handleFileInputClick}>
-                  {image ? (
+                  onClick={image ? handleDeleteImage : handleFileInputClick}>
+                  { image ? (
                     <FaTrash className="text-4xl text-white cursor-pointer" />
                   ) : (
                     <FaPlus className="text-4xl text-white cursor-pointer" />
                   )}
                 </div>
               )}
-              <input type="file" ref={fileInputRef} className="hidden"  onClick={handleChangeImage} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp" />
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageChange} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp" />
             </div>
             <div>
               <div className=" min-w-32 md:min-w-64 flex flex-col gap-5 text-white items-center">
@@ -181,9 +198,8 @@ const ProfileIndex = () => {
                   {colors.map((color, index) => (
                     <div
                       className={` ${color} h-8 w-8 rounded-full hover:cursor-pointer transition-all duration-300
-                  ${
-                    selectedColor === index ? "outline-white/50 outline-1" : ""
-                  } `}
+                  ${selectedColor === index ? "outline-white/50 outline-1" : ""
+                        } `}
                       key={index}
                       onClick={() => setSelectedColor(index)}
                     ></div>
@@ -207,3 +223,4 @@ const ProfileIndex = () => {
 };
 
 export default ProfileIndex;
+

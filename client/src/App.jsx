@@ -29,7 +29,7 @@ const App = () => {
         const response = await apiCLient.get(GET_USER_INFO, {
           withCredentials: true,
         });
-            console.log({response});
+            
             
         if (response.status == 200 && response.data.id) {
           setUserInfo(response.data);
