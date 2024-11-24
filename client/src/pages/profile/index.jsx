@@ -7,7 +7,7 @@ import { FaPlus, FaTrash } from "react-icons/fa";
 import { colors, getColor } from "../../lib/utils";
 import { toast } from "sonner";
 import apiCLient from "../../lib/api-client";
-import { ADD_PROFILE_IMAGE_ROUTE, HOST, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
+import { ADD_PROFILE_IMAGE_ROUTE, HOST, REMOVE_PROFILE_IMAGE_ROUTE, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
 const ProfileIndex = () => {
 
   const { userInfo, setUserInfo } = useAppStore();
@@ -58,14 +58,10 @@ const ProfileIndex = () => {
       setFirstName(userInfo.firstName);
       setLastName(userInfo.lastName);
       setSelectedColor(userInfo.color);  
-      console.log("userInfo.image : "+userInfo.image);
       if(userInfo.image){
-        console.log("inside setImage");
-        
         setImage(`${HOST}/${userInfo.image}`)
       }
-      console.log("after setImage");
-      
+     
           
     }
     
@@ -81,12 +77,10 @@ const ProfileIndex = () => {
 
   const handleImageChange = async (event) => {
     const file = event.target.files[0];
-    console.log({ file });
 
     if (file) {
       const formData = new FormData();
       formData.append("profile-image", file);
-      console.log("Add profile image route ke upr");
 
       const response = await apiCLient.post(ADD_PROFILE_IMAGE_ROUTE,
         formData,
@@ -96,23 +90,33 @@ const ProfileIndex = () => {
             'Content-Type': 'multipart/form-data',
           }
         });
-      console.log("image updated");
 
       if (response.status == 200 && response.data.image) {
         setUserInfo({ ...userInfo, image: response.data.image });
         toast.success("Image updated successfully")
       }
 
-      // const reader = new FileReader();
-      // reader.onload = ()=>{
-      //   setImage(reader.result);
-      // }
-      // reader.readAsDataURL(file);
     }
 
   }
 
   const handleDeleteImage = async () => {
+
+    try{
+      const respose = await apiCLient.delete(REMOVE_PROFILE_IMAGE_ROUTE,
+        {withCredentials:true}
+      );
+
+      if(respose.status==200){
+        setUserInfo({...userInfo, image:null});
+        toast.success("Profile image removed successfully");
+        setImage(null);
+        
+      }
+    }catch(err){
+      console.log(err.message);
+      
+    }
 
   }
 

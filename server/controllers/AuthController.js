@@ -217,6 +217,8 @@ export const removeProfileImage = async (req,res,next) => {
 
     user.image=null;
     await user.save();
+
+    return res.status(200).send("Profile image removed succesfully")
   }catch(err){
     console.log(err.message);
     
