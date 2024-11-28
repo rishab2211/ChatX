@@ -23,11 +23,23 @@ const MessageBar = () => {
         return ()=>{
             document.removeEventListener("mousedown", handleClickOutside);
         }
-    },[emojiRef])
+    },[emojiPickerOpen])
 
     const handleAddEmoji = (emoji)=>{
         setMessage((msg)=>msg+emoji.emoji)
     }
+
+    const toggleEmojiPicker = ()=>{
+        // console.log(`before click state :`+emojiPickerOpen);
+        
+        setEmojiPickerOpen((prev)=>!prev);
+        
+    }
+
+    useEffect(()=>{
+        console.log(`emojiPickerOpen state : ${emojiPickerOpen}`);
+        
+    },[emojiPickerOpen])
 
     return (
         <div className=' h-[10vh] bg-[#1c1d25] flex justify-center items-center px-8 mb-6 gap-6 ' >
@@ -35,10 +47,10 @@ const MessageBar = () => {
                 <input type='text' placeholder='Enter message...' value={message} onChange={(e) => setMessage(e.target.value)} className='flex-1 p-5 bg-transparent rounded-md focus:border-none focus:outline-none  ' />
                 <button className='text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-300 transition-all ' ><GrAttachment className='text-2xl' /></button>
                 <div className='relative' >
-                    <button onClick={()=>setEmojiPickerOpen((prev)=>!prev)}  className='text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-300 transition-all ' >
-                        <RiEmojiStickerLine className='text-2xl' />
+                    <button onClick={toggleEmojiPicker} ref={emojiRef}  className='text-neutral-500 focus:border-none focus:outline-none focus:text-white duration-300 transition-all ' >
+                        <RiEmojiStickerLine className='text-2xl'  />
                     </button>
-                    <div className=' absolute bottom-16 right-0 ' ref={emojiRef} >
+                    <div className=' absolute bottom-16 right-0 '   >
                         <EmojiPicker theme="dark" open={emojiPickerOpen} onEmojiClick={handleAddEmoji} />
                     </div>
                 </div>

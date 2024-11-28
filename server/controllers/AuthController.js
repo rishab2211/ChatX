@@ -138,7 +138,7 @@ export const getUserInfo = async (req, res, next) => {
       firstName: userData.firstName,
       lastName: userData.lastName,
       profileSetup: userData.profileSetup,
-      image:userData.image
+      image: userData.image
     });
   } catch (err) {
     console.log(err.message);
@@ -196,32 +196,48 @@ export const addProfileImage = async (req, res, next) => {
     )
   } catch (err) {
     console.log(err.message);
-    
+
   }
 };
 
 
-export const removeProfileImage = async (req,res,next) => {
+export const removeProfileImage = async (req, res, next) => {
 
-  try{
-    const {userId} = req;
-    const  user =await User.findById(userId);
+  try {
+    const { userId } = req;
+    const user = await User.findById(userId);
 
-    if(!user){
+    if (!user) {
       return res.status(404).send("User not found");
     }
 
-    if(user.image){
+    if (user.image) {
       unlinkSync(user.image);
     }
 
-    user.image=null;
+    user.image = null;
     await user.save();
 
     return res.status(200).send("Profile image removed succesfully")
-  }catch(err){
+  } catch (err) {
     console.log(err.message);
-    
+
+  }
+
+}
+
+
+
+export const logOut = async (req, res, next) => {
+
+  try {
+
+    res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None" })
+
+    return res.status(200).send("Logout successful")
+  } catch (err) {
+    console.log(err.message);
+
   }
 
 }

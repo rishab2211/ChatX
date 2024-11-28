@@ -1,5 +1,6 @@
 import React from 'react'
 import Logo from '../../../../assets/Logo'
+import ProfileInfo from './components/profileInfo'
 
 const ContactsContainer = () => {
   return (
@@ -17,6 +18,7 @@ const ContactsContainer = () => {
                 <Title text={"channels"} />
             </div>
         </div>
+        <ProfileInfo/>
     </div>
   )
 }

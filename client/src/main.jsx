@@ -6,9 +6,9 @@ import { Toaster } from "@/components/ui/sonner";
 
 // Creating root for rendering React app
 createRoot(document.getElementById("root")).render(
-  <StrictMode>
+  <>
     <App />
     {/* Toast notification */}
-    <Toaster closeButton />
-  </StrictMode>
+    < Toaster closeButton />
+  </>
 );
