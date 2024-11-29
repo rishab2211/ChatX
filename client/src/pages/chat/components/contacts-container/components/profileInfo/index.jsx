@@ -36,7 +36,7 @@ const ProfileInfo = () => {
     }
 
     return (
-        <div className='absolute bottom-0 flex items-center justify-between px-10 w-full bg-[#2a2b33] ' >
+        <div className='absolute bottom-0 flex items-center justify-between px-10 py-3 w-full bg-[#2a2b33] ' >
             <div className=' flex gap-3 items-center justify-center  ' >
                 <div className=' w-12 h-12 relative ' >
                     <Avatar className=" h-12 w-12 rounded-full overflow-hidden ">
@@ -68,7 +68,7 @@ const ProfileInfo = () => {
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger>
-                                <FiEdit2 className=" text-purple-500 text-xl "
+                                <FiEdit2 className=" text-purple-500 text-3xl hover:bg-[#383849] p-1 "
                                 onClick={()=>navigate("/profile")} />
                             </TooltipTrigger>
                             <TooltipContent className=" bg-[#1c1b1e]  text-white " >
@@ -80,7 +80,7 @@ const ProfileInfo = () => {
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger>
-                                <IoPowerSharp className=" text-red-500 text-xl "
+                                <IoPowerSharp className=" text-red-500 text-3xl hover:bg-[#383849] p-1 "
                                 onClick={logOut} />
                             </TooltipTrigger>
                             <TooltipContent className=" bg-[#1c1b1e]  text-white " >
