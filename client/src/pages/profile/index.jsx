@@ -8,6 +8,7 @@ import { colors, getColor } from "../../lib/utils";
 import { toast } from "sonner";
 import apiCLient from "../../lib/api-client";
 import { ADD_PROFILE_IMAGE_ROUTE, HOST, REMOVE_PROFILE_IMAGE_ROUTE, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
+import { ModeToggle } from "../../components/ui/mode-toggle";
 const ProfileIndex = () => {
 
   const { userInfo, setUserInfo } = useAppStore();
@@ -126,10 +127,11 @@ const ProfileIndex = () => {
 
   return (
     <>
-      <div className=" bg-[#1b1c24] h-[100vh] flex items-center justify-center flex-col gap-10 ">
-        <div className="flex flex-col gap-10 w-[80vw] md:w-max rounded-2xl  ">
-          <div>
-            <IoArrowBack onClick={handleNavigate} className="text-4xl lg:text-6xl text-white/90 cursor-pointer " />
+      <div className="  h-[100vh] flex items-center justify-center flex-col gap-10 ">
+        <div className="flex  flex-col gap-10 w-[80vw] md:w-max border p-4 shadow-xl rounded-2xl  ">
+          <div className="flex justify-between" >
+            <IoArrowBack onClick={handleNavigate} className="text-4xl lg:text-6xl cursor-pointer " />
+            <ModeToggle/>
           </div>
           <div className=" grid grid-cols-2 ">
             <div
@@ -157,7 +159,7 @@ const ProfileIndex = () => {
                 )}
               </Avatar>
               {hovered && (
-                <div className=" absolute inset-0 flex items-center  justify-center bg-black/50 ring-fuchsia-50 rounded-full "
+                <div className=" absolute inset-0 flex items-center border  justify-center bg-black/50 ring-fuchsia-50 rounded-full "
                   onClick={image ? handleDeleteImage : handleFileInputClick}>
                   { image ? (
                     <FaTrash className="text-4xl text-white cursor-pointer" />
@@ -169,14 +171,14 @@ const ProfileIndex = () => {
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageChange} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp" />
             </div>
             <div>
-              <div className=" min-w-32 md:min-w-64 flex flex-col gap-5 text-white items-center">
+              <div className=" min-w-32 md:min-w-64 flex flex-col gap-5 items-center">
                 <div className="w-full ">
                   <input
                     placeholder="Email"
                     type="email"
                     disabled
                     value={userInfo.email}
-                    className="rounded-lg p-6 bg-[#2c2e3b] border-none"
+                    className="rounded-lg p-6 border"
                   />
                 </div>
                 <div className="w-full">
@@ -185,7 +187,7 @@ const ProfileIndex = () => {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="rounded-lg p-6 bg-[#2c2e3b] border-none"
+                    className="rounded-lg dark:bg-slate-900 bg-slate-50 p-6 border"
                   />
                 </div>
                 <div className="w-full">
@@ -194,7 +196,7 @@ const ProfileIndex = () => {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="rounded-lg p-6 bg-[#2c2e3b] border-none"
+                    className="rounded-lg p-6 dark:bg-slate-900 bg-slate-50 border"
                   />
                 </div>
 
@@ -213,7 +215,7 @@ const ProfileIndex = () => {
             </div>
             <div className="w-full">
               <button
-                className="text-white h-16 w-full bg-purple-700 hover:bg-purple-900 p-2 transition-all duration-300 rounded-lg"
+                className="text-white font-semibold text-lg h-16 w-full bg-purple-600 hover:bg-purple-800 p-2 transition-all duration-300 rounded-lg"
                 onClick={saveChanges}
               >
                 Save Changes

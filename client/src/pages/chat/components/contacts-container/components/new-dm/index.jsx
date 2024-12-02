@@ -56,23 +56,23 @@ const NewDM = () => {
                 <Tooltip>
                     <TooltipTrigger>
                         <FaPlus
-                            className='text-neutral-400 hover:text-white   '
+                            className='text-slate-400 hover:text-neutral-600 dark:hover:text-white   '
                             onClick={handleOpenNewContactModalCLick}
                         />
                     </TooltipTrigger>
-                    <TooltipContent className=" bg-[#1c1b1e]  text-white font-light opacity-90 transition-all duration-300  " >
+                    <TooltipContent className="   dark:text-white font-light opacity-90 transition-all duration-300  " >
                         <p>Select new contact</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
  
             <Dialog open={openNewContactModal} onOpenChange={setOpenNewContactModal} >
-                <DialogContent className=" bg-[#181920] border-none text-white w-[400px]  h-[400px] flex flex-col cursor-pointer transition-all duration-300  " >
+                <DialogContent className="  border-none dark:text-white w-[400px]  h-[400px] flex flex-col cursor-pointer transition-all duration-300  " >
                     <DialogHeader>
                         <DialogTitle>Please select a contact</DialogTitle>
                     </DialogHeader>
                     <div>
-                        <Input placeholder="search contacts..." onChange={(e) => searchContacts(e.target.value)} className=" rounded-lg p-6 bg-[#2c2e3b] border-none  " />
+                        <Input placeholder="search contacts..." onChange={(e) => searchContacts(e.target.value)} className=" rounded-lg p-6  border " />
                     </div>
 
                     {
@@ -84,7 +84,7 @@ const NewDM = () => {
                                     width={100}
                                     options={animationDefaultOptions}
                                 />
-                                <div className=' text-opacity-80 text-white flex flex-col gap-10 items-center mt-5 lg:text-2xl text-xl transition-all duration-300 text-center  ' >
+                                <div className=' text-opacity-80 dark:text-white flex flex-col gap-10 items-center mt-5 lg:text-2xl text-xl transition-all duration-300 text-center  ' >
                                     <h4 className='poppins-medium' >
                                         Searching<span className='text-purple-500' >...</span>
                                     </h4>
@@ -95,7 +95,7 @@ const NewDM = () => {
                     <ScrollArea className=" h-[250px]  ">
                         {
                             searchedContacts.map((contact) => (
-                                <div key={contact._id} className='flex gap-5 cursor-pointer hover:bg-[#463d6d] p-2 rounded-lg ' >
+                                <div key={contact._id} className='flex gap-5 cursor-pointer  p-2 rounded-lg ' >
                                     <div className=' w-12 h-12 relative flex gap-5  ' >
                                         <Avatar className=" h-12 w-12 rounded-full overflow-hidden ">
                                             {contact.image ? (

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useAppStore } from '../../../../../../store'
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST, LOGOUT_ROUTE } from '../../../../../../utils/constants';
@@ -12,6 +12,7 @@ import { FiEdit2 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { IoPowerSharp} from "react-icons/io5"
 import apiCLient from '../../../../../../lib/api-client';
+import { getColor } from '../../../../../../lib/utils';
 
 
 const ProfileInfo = () => {
@@ -36,7 +37,7 @@ const ProfileInfo = () => {
     }
 
     return (
-        <div className='absolute bottom-0 flex items-center justify-between px-10 py-3 w-full bg-[#2a2b33] ' >
+        <div className='absolute bottom-0 flex items-center justify-between border border-t-[#2f303b]  px-10 py-3 w-full  ' >
             <div className=' flex gap-3 items-center justify-center  ' >
                 <div className=' w-12 h-12 relative ' >
                     <Avatar className=" h-12 w-12 rounded-full overflow-hidden ">
@@ -48,9 +49,8 @@ const ProfileInfo = () => {
                             />
                         ) : (
                             <div
-                                className={`uppercase h-12 w-12 text-lg border-[1px] flex items-center justify-center ${getColor(
-                                    userInfo.color
-                                )} `}
+                                className={`uppercase h-12 w-12 text-lg border-[1px] flex
+                                     items-center justify-center ${getColor(userInfo.color)} `}
                             >
                                 {userInfo.firstName
                                     ? userInfo.firstName.split("").shift()
@@ -59,7 +59,7 @@ const ProfileInfo = () => {
                         )}
                     </Avatar>
                 </div>
-                <div className='  ' >
+                <div className=' text-black dark:text-white  ' >
                     {
                         userInfo.firstName && userInfo.lastName ? `${userInfo.firstName} ${userInfo.lastName}` : ""
                     }
@@ -68,10 +68,10 @@ const ProfileInfo = () => {
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger>
-                                <FiEdit2 className=" text-purple-500 text-3xl hover:bg-[#383849] p-1 "
+                                <FiEdit2 className=" text-purple-500 text-3xl  p-1 "
                                 onClick={()=>navigate("/profile")} />
                             </TooltipTrigger>
-                            <TooltipContent className=" bg-[#1c1b1e]  text-white " >
+                            <TooltipContent className="" >
                                 <p>Edit Profile</p>
                             </TooltipContent>
                         </Tooltip>
@@ -80,10 +80,10 @@ const ProfileInfo = () => {
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger>
-                                <IoPowerSharp className=" text-red-500 text-3xl hover:bg-[#383849] p-1 "
+                                <IoPowerSharp className=" text-red-500 text-3xl  p-1 "
                                 onClick={logOut} />
                             </TooltipTrigger>
-                            <TooltipContent className=" bg-[#1c1b1e]  text-white " >
+                            <TooltipContent className="" >
                                 <p>Logout</p>
                             </TooltipContent>
                         </Tooltip>

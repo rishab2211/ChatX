@@ -6,6 +6,8 @@ import ProfileIndex from "./pages/profile";
 import { useAppStore } from "./store";
 import apiCLient from "./lib/api-client";
 import { GET_USER_INFO } from "./utils/constants";
+import { ThemeProvider } from "./components/ui/theme-provider"
+
 
 const PrivateRoute = ({ children }) => {
   const { userInfo } = useAppStore();
@@ -29,8 +31,8 @@ const App = () => {
         const response = await apiCLient.get(GET_USER_INFO, {
           withCredentials: true,
         });
-            
-            
+
+
         if (response.status == 200 && response.data.id) {
           setUserInfo(response.data);
         } else {
@@ -56,6 +58,7 @@ const App = () => {
 
   return (
     <>
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <BrowserRouter>
         <Routes>
           {/* Auth page comprising of signup and login */}
@@ -90,6 +93,7 @@ const App = () => {
           <Route path="*" element={<Navigate to="/auth" />} />
         </Routes>
       </BrowserRouter>
+    </ThemeProvider >
     </>
   );
 };
