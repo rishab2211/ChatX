@@ -36,6 +36,8 @@ const ProfileInfo = () => {
         }
     }
 
+
+
     return (
         <div className='absolute bottom-0 flex items-center justify-between border border-t-[#2f303b]  px-10 py-3 w-full  ' >
             <div className=' flex gap-3 items-center justify-center  ' >
@@ -48,6 +50,9 @@ const ProfileInfo = () => {
                                 className=" object-cover w-full h-full "
                             />
                         ) : (
+                                                <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger>
                             <div
                                 className={`uppercase h-12 w-12 text-lg border-[1px] flex
                                      items-center justify-center ${getColor(userInfo.color)} `}
@@ -56,6 +61,12 @@ const ProfileInfo = () => {
                                     ? userInfo.firstName.split("").shift()
                                     : userInfo.email.split("").shift()}
                             </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="" >
+                                <p>If the profile image not loaded refresh again</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                         )}
                     </Avatar>
                 </div>

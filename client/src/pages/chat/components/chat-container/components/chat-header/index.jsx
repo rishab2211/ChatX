@@ -7,7 +7,7 @@ const ChatHeader = () => {
             <div className='flex gap-5 items-center  ' >
                 <div className='flex gap-3 items-center justify-center ' >
                     <div className=' flex justify-center items-center gap-5  ' >
-                        <button className='dark:text-neutral-500 text-neutral-700 focus:neutral-800 focus:border-none focus:outline-none dark:focus:text-white dark:focus:text-neutral-300 duration-300 transition-all '   >
+                        <button className='dark:text-neutral-500 text-neutral-700 focus:neutral-800 focus:border-none focus:outline-none dark:focus:text-neutral-300 duration-300 transition-all '   >
                             <RiCloseFill className='text-3xl' />
                         </button>
                     </div>
