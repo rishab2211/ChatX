@@ -31,11 +31,11 @@ const ProfileInfo = () => {
                 navigate("/auth");
                 setUserInfo(null);
             }
+            localStorage.setItem("vite-ui-theme","light");
         }catch(err){
             console.log(err.message)
         }
     }
-
 
 
     return (

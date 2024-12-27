@@ -22,13 +22,14 @@ import apiCLient from '../../../../../../lib/api-client'
 import { SEARCH_CONTACTS_ROUTE } from '../../../../../../utils/constants'
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST } from '../../../../../../utils/constants'
+import { useAppStore } from '../../../../../../store'
 const NewDM = () => {
 
     const [openNewContactModal, setOpenNewContactModal] = useState(false);
     const [searchedContacts, setSearchedContacts] = useState([]);
-
+    const {setSelectedChatType, setSelectedChatData, selectedChatType} = useAppStore();
     const handleOpenNewContactModalCLick = () => {
-        setOpenNewContactModal((prev) => !prev)
+        setOpenNewContactModal((prev) => !prev) 
 
     }
 
@@ -49,6 +50,20 @@ const NewDM = () => {
             console.log(err.message);
         }
     }
+
+    const seletNewContact = (contact)=>{
+        setOpenNewContactModal(false);
+        setSelectedChatType("contact");
+        setSelectedChatData(contact);
+        setSearchedContacts([]);
+        console.log(selectedChatType);
+        
+    }
+
+    // useEffect(()=>{
+    //     console.log(selectedChatType);
+        
+    // },[openNewContactModal])
 
     return (
         <>
@@ -92,17 +107,20 @@ const NewDM = () => {
                             </div>
                         </div>
                     }
+
+                    { searchedContacts.length>0 && (
                     <ScrollArea className=" h-[250px]  ">
                         {
                             searchedContacts.map((contact) => (
-                                <div key={contact._id} className='flex gap-5 cursor-pointer  p-2 rounded-lg ' >
-                                    <div className=' w-12 h-12 relative flex gap-5  ' >
+                                <div key={contact._id} className='flex hover:bg-slate-100 dark:hover:bg-slate-800 gap-5 cursor-pointer  p-2 rounded-lg ' >
+                                    <div className=' w-12 h-12 relative flex gap-5  ' onClick={()=>seletNewContact(contact)}  >
                                         <Avatar className=" h-12 w-12 rounded-full overflow-hidden ">
                                             {contact.image ? (
                                                 <AvatarImage
                                                     src={`${HOST}/${contact.image}`}
                                                     alt="profile-image"
                                                     className=" object-cover w-full h-full "
+                                                    
                                                 />
                                             ) : (
                                                 <div
@@ -128,7 +146,7 @@ const NewDM = () => {
                                 </div>
                             ))
                         }
-                    </ScrollArea>
+                    </ScrollArea>)}
                 </DialogContent>
             </Dialog>
  

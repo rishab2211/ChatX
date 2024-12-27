@@ -8,7 +8,7 @@ import ChatContainer from './components/chat-container';
 
 const ChatIndex = () => {
 
-  const {userInfo} = useAppStore();
+  const {userInfo, selectedChatType} = useAppStore();
 
   const navigate = useNavigate();
 
@@ -19,12 +19,24 @@ const ChatIndex = () => {
     }
   },[userInfo, navigate]);
 
+  useEffect(()=>{
+    console.log(selectedChatType);
+    
+  },[])
+
 
   return (
     <div className='flex h-[100vh] w-[100vw] text-white overflow-hidden  ' >
+
+     
       <ContactsContainer/>
-      {/* <EmptyChatContainer/> */}
-      <ChatContainer/>
+
+      
+      {
+        selectedChatType === undefined?(<EmptyChatContainer/>):(<ChatContainer/>)
+      }
+   
+      
     </div>
   )
 }

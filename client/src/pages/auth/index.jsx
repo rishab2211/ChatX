@@ -154,16 +154,16 @@ const AuthIndex = () => {
 
   return (
     // main outer div
-    <div className=" h-[100vh] w-[100vw] flex items-center justify-center ">
+    <div className=" h-[100vh] w-[100vw] flex dark:bg-white items-center justify-center ">
       {/* // container div containing all the fields, buttons, texts */}
-      <div className=" h-[80vh] bg-white dark:bg-slate-900 border-2 border-slate-200 text-opacity-90 shadow-2xl w-[80vw] md:w-[90vw] lg:w-[70vw] rounded-3xl p-2 grid xl:grid-cols-2">
+      <div className=" h-[80vh] bg-white dark:bg-white border-2 border-slate-200 text-opacity-90 shadow-2xl w-[80vw] md:w-[90vw] lg:w-[70vw] rounded-3xl p-2 grid xl:grid-cols-2">
         {/* Upper texts and icon div */}
         <div className="flex items-center justify-center flex-col">
           <div className="flex items-center justify-center">
-            <h1 className=" text-4xl font-bold md:text-6xl dark:text-white ">Welcome</h1>
+            <h1 className=" text-4xl font-bold md:text-6xl dark:text-black ">Welcome</h1>
             <img src={ChatIcon} alt="Chat icon " className="w-16  " />
           </div>
-          <p className="text-xl ">Fill in the details to start a Chat!</p>
+          <p className="text-xl dark:text-black ">Fill in the details to start a Chat!</p>
         </div>
 
         {/* main fields and buttons div  */}
@@ -174,7 +174,7 @@ const AuthIndex = () => {
               {/* login tab */}
               <TabsTrigger
                 value="login"
-                className={` data-[state=active]:bg-transparent text-black dark:text-white text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
+                className={` data-[state=active]:bg-transparent text-black dark:text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
                 
               >
                 Login
@@ -183,7 +183,7 @@ const AuthIndex = () => {
               {/* Signup tab */}
               <TabsTrigger
                 value="signup"
-                className={` data-[state=active]:bg-transparent text-black dark:text-white text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
+                className={` data-[state=active]:bg-transparent text-black dark:text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
                 
               >
                 Signup
@@ -195,19 +195,19 @@ const AuthIndex = () => {
               <Input
                 placeholder="Email"
                 type="email"
-                className="rounded-full p-6 "
+                className="rounded-full p-6 dark:bg-white dark:text-black"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Input
                 placeholder="Password"
                 type="password"
-                className="rounded-full p-6 "
+                className="rounded-full p-6 dark:bg-white dark:text-black "
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
 
-              <Button className="rounded-full p-6" onClick={handleLogin}>
+              <Button className="rounded-full p-6 dark:bg-black text-white" onClick={handleLogin}>
                 Login
               </Button>
             </TabsContent>
@@ -217,26 +217,26 @@ const AuthIndex = () => {
               <Input
                 placeholder="Email"
                 type="email"
-                className="rounded-full p-6 "
+                className="rounded-full p-6 dark:bg-white text-black "
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Input
                 placeholder="Password"
                 type="text"
-                className="rounded-full p-6 "
+                className="rounded-full p-6  dark:bg-white text-black"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
               <Input
                 placeholder="Confirm Password"
                 type="password"
-                className="rounded-full p-6 "
+                className="rounded-full p-6 dark:bg-white text-black"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
 
-              <Button className="rounded-full p-6" onClick={handleSignup}>
+              <Button className="rounded-full p-6 dark:bg-black text-white" onClick={handleSignup}>
                 Signup
               </Button>
             </TabsContent>
@@ -248,3 +248,4 @@ const AuthIndex = () => {
 };
 
 export default AuthIndex;
+
