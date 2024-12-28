@@ -8,10 +8,8 @@ import {
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
@@ -46,6 +44,9 @@ const NewDM = () => {
                     setSearchedContacts(response.data.contacts)
                 }
             }
+            else{
+                setSearchedContacts([]);
+            }
         } catch (err) {
             console.log(err.message);
         }
@@ -59,11 +60,6 @@ const NewDM = () => {
         console.log(selectedChatType);
         
     }
-
-    // useEffect(()=>{
-    //     console.log(selectedChatType);
-        
-    // },[openNewContactModal])
 
     return (
         <>
@@ -91,8 +87,8 @@ const NewDM = () => {
                     </div>
 
                     {
-                        searchedContacts.length <= 0 && <div>
-                            <div className=' flex-1 md:flex flex-col justify-center items-center hidden duration-1000 transition-all ' >
+                        searchedContacts.length <=0 && <div>
+                            <div className=' flex-1 md:flex flex-col m-5 justify-center items-center duration-1000 transition-all ' >
                                 <Lottie
                                     isClickToPauseDisabled={true}
                                     height={100}

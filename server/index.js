@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
 import authRoutes from "./routes/AuthRoutes.js";
 import { contactsRoutes } from "./routes/ContactRoutes.js";
+import setupSocket from "./socket.js";
 
 // loads environment variables from .env
 dotenv.config();
@@ -48,6 +49,9 @@ app.use("/api/contacts",contactsRoutes);
 const server = app.listen(port, () => {
   console.log(`Server is running at port ${port}`);
 });
+
+// app.use(setupSocket);
+setupSocket(server);
 
 // creating unique index at email field to ensure no two user have same email
 mongoose
