@@ -72,10 +72,14 @@ import { GrAttachment } from "react-icons/gr";
 import { IoSend } from 'react-icons/io5';
 import { RiEmojiStickerLine } from 'react-icons/ri';
 import EmojiPicker from "emoji-picker-react"
+import { useAppStore } from '../../../../../../store';
+import { useSocket } from '../../../../../../context/SocketContext';
 
 const MessageBar = () => {
     const [message, setMessage] = useState("");
     const emojiRef = useRef();
+    const socket = useSocket();
+    const {selectedChatType, selectedChatData, userInfo} = useAppStore();
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
     useEffect(() => {
@@ -98,6 +102,18 @@ const MessageBar = () => {
     const handleAddEmoji = (emoji) => {
         setMessage((msg) => msg + emoji.emoji);
         // Don't close the picker after selecting an emoji
+    }
+
+    const handleSendMessage = async()=>{
+        if(selectedChatType==="contact"){
+            socket.emit("sendMessage",{
+                sender:userInfo.id,
+                content: message,
+                recipient: selectedChatData._id,
+                messageTypes : "text",
+                fileUrl: undefined
+            })
+        }
     }
 
     const toggleEmojiPicker = (e) => {
@@ -135,7 +151,8 @@ const MessageBar = () => {
                     </div>
                 </div>
             </div>
-            <button className='text-neutral-500 border border-slate-500 p-3 rounded-md focus:border-none focus:outline-none focus:text-white duration-300 transition-all'>
+            <button className='text-neutral-500 border border-slate-500 p-3 rounded-md focus:border-none focus:outline-none focus:text-white duration-300 transition-all'
+                    onClick={handleSendMessage}>
                 <IoSend className='text-2xl' />
             </button>
         </div>

@@ -25,7 +25,7 @@ const NewDM = () => {
 
     const [openNewContactModal, setOpenNewContactModal] = useState(false);
     const [searchedContacts, setSearchedContacts] = useState([]);
-    const {setSelectedChatType, setSelectedChatData, selectedChatType} = useAppStore();
+    const {setSelectedChatType, setSelectedChatData,selectedChatData, selectedChatType} = useAppStore();
     const handleOpenNewContactModalCLick = () => {
         setOpenNewContactModal((prev) => !prev) 
 
@@ -52,13 +52,18 @@ const NewDM = () => {
         }
     }
 
+
+    // useEffect(()=>{
+    //     console.log("chat type : "+Date.now()+selectedChatType);
+    //     console.log("chat data at "+Date.now()+selectedChatData)
+        
+    // },[selectedChatData,selectedChatType])
+
     const seletNewContact = (contact)=>{
         setOpenNewContactModal(false);
         setSelectedChatType("contact");
         setSelectedChatData(contact);
-        setSearchedContacts([]);
-        console.log(selectedChatType);
-        
+        setSearchedContacts([]);        
     }
 
     return (
