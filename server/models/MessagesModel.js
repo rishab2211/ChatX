@@ -1,4 +1,4 @@
-import mongoose, { model, mongo } from "mongoose";
+import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema({
     sender : {
@@ -9,8 +9,9 @@ const messageSchema = new mongoose.Schema({
     recipient : {
         type : mongoose.Schema.Types.ObjectId,
         ref : "Users",
+        required : false
     },
-    messageTypes : {
+    messageType : {
         type : String,
         enum : ["text","file"],
         required : true,
@@ -18,13 +19,13 @@ const messageSchema = new mongoose.Schema({
     content : {
         type:String,
         required :function(){
-            return this.messageTypes==="text";
+            return this.messageType==="text";
         }
     },
     fileUrl :{
         type:String,
         required :function(){
-            return this.messageTypes==="file";
+            return this.messageType==="file";
         }
     },
     timestamp:{

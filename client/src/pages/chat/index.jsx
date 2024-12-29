@@ -19,10 +19,10 @@ const ChatIndex = () => {
     }
   },[userInfo, navigate]);
 
-  useEffect(()=>{
-    console.log(selectedChatType);
+  // useEffect(()=>{
+  //   console.log(selectedChatType);
     
-  },[])
+  // },[])
 
 
   return (
