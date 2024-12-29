@@ -32,14 +32,14 @@ export const SocketProvider = ({ children }) => {
                 console.log(`Connected to socket server`);
 
             })
-            console.log("socket current connect k niche");
+            // console.log("socket current connect k niche");
 
             const handleRecieveMessage = (message) => {
 
                 const {selectedChatData,selectedChatType, addMessage} = useAppStore.getState();
-                console.log("selected Chat data :"+selectedChatData._id);
-                console.log("message sender :"+message.sender._id);
-                console.log("message sender :"+message.recipient._id);
+                // console.log("selected Chat data :"+selectedChatData._id);
+                // console.log("message sender :"+message.sender._id);
+                // console.log("message sender :"+message.recipient._id);
                 
                 
                 if(selectedChatType!==undefined &&

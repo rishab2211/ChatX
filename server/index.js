@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import authRoutes from "./routes/AuthRoutes.js";
 import { contactsRoutes } from "./routes/ContactRoutes.js";
 import setupSocket from "./socket.js";
+import messagesRoutes from "./routes/MessagesRoute.js";
 
 // loads environment variables from .env
 dotenv.config();
@@ -44,7 +45,7 @@ app.use(cookieParser());
 // all authentication-related requests will be handles by authRoutes
 app.use("/api/auth", authRoutes);
 app.use("/api/contacts",contactsRoutes);
-
+app.use("/api/messages",messagesRoutes);
 // server starting
 const server = app.listen(port, () => {
   console.log(`Server is running at port ${port}`);

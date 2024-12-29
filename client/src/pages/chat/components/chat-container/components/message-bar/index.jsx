@@ -38,16 +38,16 @@ const MessageBar = () => {
     const handleSendMessage = async()=>{
         if(selectedChatType==="contact"){
 
-            console.log("Message to send:", message);
+            // console.log("Message to send:", message);
 
 
-            console.log("Sending message:", {
-                sender: userInfo.id,
-                content: message,
-                recipient: selectedChatData._id,
-                messageType: "text",
-                fileUrl: undefined,
-            });
+            // console.log("Sending message:", {
+            //     sender: userInfo.id,
+            //     content: message,
+            //     recipient: selectedChatData._id,
+            //     messageType: "text",
+            //     fileUrl: undefined,
+            // });
 
             socket.emit("sendMessage",{
                 sender:userInfo.id,
