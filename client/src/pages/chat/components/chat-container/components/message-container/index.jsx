@@ -48,8 +48,8 @@ const MessageContainer = () => {
         {message.messageType === "text" && (
           <div className={`${
             message.sender !== selectedChatData._id 
-              ? "bg-[#8417ff]/5 text-[#8417ff]/90 border-[#8417ff]/50" 
-              : "bg-[#2a2b33]/5 text-white/80 border-[#ffffff]/20"
+              ? "bg-[#8417ff]/5 dark:bg-[#8417ff]/5  text-[#8417ff]/90 dark:text-[#8417ff]/90 border-[#8417ff]/50" 
+              : "bg-[#2a2b33]/10 text-black dark:text-white/80 border-[#ffffff]/20"
             } border inline-block p-4 rounded my-1 max-w-[50%]`}>
             {message.content}
           </div>
