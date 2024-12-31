@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import animationData from "../assets/lottie-json.json";
+import animationData from "../assets/Two-people-chatting.json";
 
 
 

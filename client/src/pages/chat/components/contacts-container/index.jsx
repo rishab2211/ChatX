@@ -6,9 +6,11 @@ import { ModeToggle } from '../../../../components/ui/mode-toggle'
 import { useAppStore } from '../../../../store'
 import apiCLient from '../../../../lib/api-client'
 import { GET_CONTACTS_ROUTES } from '../../../../utils/constants'
+import ContactList from '../../../../components/ui/contact-list'
+import CreateChannel from './components/create-channel'
 // 
 const ContactsContainer = () => {
-  const { selectedChatType } = useAppStore();
+  const { selectedChatType, directMessagesContacts, setDirectMessagesContacts } = useAppStore();
 // 
   const containerVisibility = selectedChatType === undefined 
     ? 'w-full md:w-[35vw] lg:w-[30vw] xl:w-[20vw]'
@@ -22,7 +24,7 @@ const ContactsContainer = () => {
         );
 
         if(response.data.contacts){
-          console.log(response.data.contacts)
+          setDirectMessagesContacts(response.data.contacts)
         }
       }
 
@@ -40,10 +42,14 @@ const ContactsContainer = () => {
           <Title text="Direct messages" />
           <NewDM />
         </div>
+        <div className=' max-h-[38vh] overflow-y-auto scrollbar-hidden ' >
+          <ContactList contacts={directMessagesContacts} />
+        </div>
       </div>
       <div className='my-5'>
         <div className='flex items-center justify-between pr-10'>
           <Title text="channels" />
+          <CreateChannel/>
         </div>
       </div>
       <ProfileInfo />

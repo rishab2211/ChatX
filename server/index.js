@@ -37,7 +37,7 @@ app.use(
 // app.use("/uploads/profiles",express.static("uploads/profiles"))
 
 app.use('/uploads/profiles', express.static('uploads/profiles'));
-
+app.use("/uploads/files",express.static("uploads/files"));
 
 // parsing incoming requests making them accessible via res.cookies
 app.use(cookieParser());

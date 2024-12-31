@@ -2,10 +2,13 @@ export const createChatSlice = (set, get) => ({
   selectedChatType: undefined,
   selectedChatData: undefined,
   selectedChatMessages: [],
+  directMessagesContacts : [],
   setSelectedChatType: (selectedChatType) => set({ selectedChatType }),
   setSelectedChatData: (selectedChatData) => set({ selectedChatData }),
   setSelectedChatMessages: (selectedChatMessages) =>
     set({ selectedChatMessages }),
+  setDirectMessagesContacts: (directMessagesContacts)=>
+    set({directMessagesContacts}),
   closeChat: () =>
     set({
       selectedChatType: undefined,
@@ -36,17 +39,3 @@ export const createChatSlice = (set, get) => ({
     });
   },
 });
-
-// set({
-// selectedChatMessages: [
-// ...selectedChatMessages,{
-// ...message,
-// recipient: selectedChatType==="channel"?
-// message.recipient:
-// message.recipient._id,
-// messageType: message.messageType || "text", // Fallback to "text"
-// content: message.content || "", // Ensure content is provided
-// fileUrl: message.fileUrl || null,
-// }
-// ]
-// })
