@@ -7,6 +7,14 @@ import { useAppStore } from "./store";
 import apiCLient from "./lib/api-client";
 import { GET_USER_INFO } from "./utils/constants";
 import { ThemeProvider } from "./components/ui/theme-provider"
+import Lottie from 'react-lottie';
+import animationData from "../src/assets/customer-service-chat.json";
+export const animationDefaultOptionsChatLoading = {
+  loop:true,
+  autoplay:true,
+  animationData
+}
+
 
 
 const PrivateRoute = ({ children }) => {
@@ -48,12 +56,20 @@ const App = () => {
     if (!userInfo) {
       getUserData();
     } else {
-      setLoading(false);
+      setLoading(false);      
     }
   }, [userInfo]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className=" w-[100vw] h-[100vh] flex justify-between items-center pb-20" >
+      
+      <Lottie
+            isClickToPauseDisabled={true}
+            height={400}
+            width={400}
+            options={animationDefaultOptionsChatLoading}
+            />
+    </div>;
   }
 
   return (
