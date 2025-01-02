@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../../../../../store'
 import moment from "moment"
 import apiCLient from '../../../../../../lib/api-client';
-import { GET_ALL_MESSAGES_ROUTE, HOST } from '../../../../../../utils/constants';
+import { GET_ALL_MESSAGES_ROUTE, GET_CHANNEL_MESSAGES, HOST } from '../../../../../../utils/constants';
 import { MdFolderZip } from "react-icons/md";
 import { IoMdDownload } from "react-icons/io";
 import { IoMdClose } from "react-icons/io";
+import { Avatar, AvatarFallback, AvatarImage } from '../../../../../../components/ui/avatar';
+import { getColor } from '../../../../../../lib/utils';
 
 const MessageContainer = () => {
   const scrollRef = useRef();
@@ -34,20 +36,47 @@ const MessageContainer = () => {
         }
 
       } catch (err) {
-        console.log("something went wrong.")
+        console.log(err)
       }
     }
     // console.log("yeh hai selected chat data id : "+selectedChatData._id);
+
+
+    const getChannelMessages = async ()=>{
+      try{
+        console.log("inside getChannel messages");
+        console.log(selectedChatData);
+        
+        const response = await apiCLient.get(
+          `${GET_CHANNEL_MESSAGES}/${selectedChatData._id}`,
+          {withCredentials:true}
+        );
+
+        console.log(response);
+        
+
+        if(response.data.messages){
+          setSelectedChatMessages(response.data.messages);
+        }
+      }catch(err){
+        console.log(err);
+        
+      }
+    }
 
     if (selectedChatData._id) {
 
       if (selectedChatType === "contact") {
         getStoredMessages();
+      }else if(selectedChatType==="channel"){
+        getChannelMessages();
       }
     }
   }, [selectedChatData, selectedChatType])
 
   const renderDMMessages = (message) => {
+    console.log("message : " + message);
+
     return (
       <div className={`${message.sender === selectedChatData._id ? "text-left" : "text-right"}`}>
         {message.messageType === "text" && (
@@ -59,45 +88,134 @@ const MessageContainer = () => {
           </div>
         )}
 
-        {
-          message.messageType === "file" && (
-            <div className={`${message.sender !== selectedChatData._id
-              ? "bg-[#8417ff]/5 dark:bg-[#8417ff]/5  text-[#8417ff]/90 dark:text-[#8417ff]/90 border-[#8417ff]/50"
-              : "bg-[#2a2b33]/10 text-black dark:text-white/80 border-[#ffffff]/20"
-              } border inline-block p-4 rounded my-1 max-w-[50%]`}>
 
-              {checkIfImage(message.fileUrl) ?
-                <div className="cursor-pointer"
-                  onClick={() => {
-                    setShowImage(true);
-                    setImageURL(message.fileUrl);
-                  }}>
-                  {<img src={`${HOST}/${message.fileUrl}`} width={300} height={300} />}
-                </div> :
-                <div className='flex justify-center items-center gap-4 '>
-                  <div className='text-white/8 flex flex-col text-3xl rounded-full p-1 ' >
-                    <div className='flex items-center justify-between' >
-                      <MdFolderZip />
-                      <div className=' w-fit rounded-full p-3 hover:bg-black/20 cursor-pointer transition-all duration-300  '
-                        onClick={() => { downloadFile(message.fileUrl) }}>
-                        <IoMdDownload />
-                      </div>
+        {message.messageType === "file" && (
+          <div className={`${message.sender !== selectedChatData._id
+            ? "bg-[#8417ff]/5 dark:bg-[#8417ff]/5  text-[#8417ff]/90 dark:text-[#8417ff]/90 border-[#8417ff]/50"
+            : "bg-[#2a2b33]/10 text-black dark:text-white/80 border-[#ffffff]/20"
+            } border inline-block p-4 rounded my-1 max-w-[50%]`}>
+            {checkIfImage(message.fileUrl) ? (
+              <div className="cursor-pointer"
+                onClick={() => {
+                  setShowImage(true);
+                  setImageURL(message.fileUrl);
+                }}>
+                {<img src={`${HOST}/${message.fileUrl}`} className="max-w-[300px] w-full h-auto object-contain" alt="message" />}
+              </div>
+            ) : (
+              <div className='flex justify-center items-center'>
+                <div className='text-white/8 flex flex-col text-3xl rounded-full p-1 w-full min-w-0'>
+                  <div className='flex items-center justify-between gap-2'>
+                    <MdFolderZip className="flex-shrink-0" />
+                    <div className='w-fit rounded-full p-3 hover:bg-black/20 cursor-pointer transition-all duration-300 flex-shrink-0'
+                      onClick={() => { downloadFile(message.fileUrl) }}>
+                      <IoMdDownload />
                     </div>
-                    <span>{message.fileUrl.split("/").pop()}</span>
-
                   </div>
+                  <span className="text-base break-words break-all">{message.fileUrl.split("/").pop()}</span>
                 </div>
-              }
+              </div>
+            )}
+          </div>
+        )}
 
-            </div>
-          )
-        }
+
+
+
         <div className='text-xs text-gray-600'>
           {moment(message.timestamp).format("LT")}
         </div>
       </div>
     )
   }
+
+
+
+
+  const renderChannelMessages = (message) => {
+    console.log("inside channel");
+
+    // console.log("message  : "+message);
+    return (
+      <div className={`mt- ${message.sender._id !== userInfo.id ? "text-left" : "text-right"}`}>
+        {message.messageType === "text" && (
+          <div
+            className={`${message.sender._id === userInfo.id
+              ? "bg-[#8417ff]/5 dark:bg-[#8417ff]/5 text-[#8417ff]/90 dark:text-[#8417ff]/90 border-[#8417ff]/50"
+              : "bg-[#2a2b33]/10 text-black dark:text-white/80 border-[#ffffff]/20"
+              } border ml-8 inline-block p-3 rounded my-1 max-w-[50%]`}
+          >
+            {message.content}
+          </div>
+        )}
+        {message.messageType === "file" && (
+          <div className={`${message.sender._id === userInfo.id
+            ? "bg-[#8417ff]/5 dark:bg-[#8417ff]/5  text-[#8417ff]/90 dark:text-[#8417ff]/90 border-[#8417ff]/50"
+            : "bg-[#2a2b33]/10 text-black dark:text-white/80 border-[#ffffff]/20"
+            } border inline-block p-4 rounded my-1 max-w-[50%]`}>
+            {checkIfImage(message.fileUrl) ? (
+              <div className="cursor-pointer"
+                onClick={() => {
+                  setShowImage(true);
+                  setImageURL(message.fileUrl);
+                }}>
+                {<img src={`${HOST}/${message.fileUrl}`} className="max-w-[300px] w-full h-auto object-contain" alt="message" />}
+              </div>
+            ) : (
+              <div className='flex justify-center items-center'>
+                <div className='text-white/8 flex flex-col text-3xl rounded-full p-1 w-full min-w-0'>
+                  <div className='flex items-center justify-between gap-2'>
+                    <MdFolderZip className="flex-shrink-0" />
+                    <div className='w-fit rounded-full p-3 hover:bg-black/20 cursor-pointer transition-all duration-300 flex-shrink-0'
+                      onClick={() => { downloadFile(message.fileUrl) }}>
+                      <IoMdDownload />
+                    </div>
+                  </div>
+                  <span className="text-base break-words break-all ">{message.fileUrl.split("/").pop()}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {message.sender && message.sender._id !== userInfo.id ? (
+          <div className="flex gap-1 items-center ">
+            <Avatar className="h-8 w-8 rounded-full overflow-hidden">
+              {message.sender.image ? (
+                <AvatarImage
+                  src={`${HOST}/${message.sender.image}`}
+                  alt="profile-image"
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <AvatarFallback
+                  className={`uppercase h-4 w-4 text-lg flex items-center justify-center ${getColor(
+                    message.sender.color
+                  )}`}
+                >
+                  {message.sender !== undefined && message.sender.firstName
+                    ? message.sender.firstName
+                    : message.sender.email}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <span className=' text-sm  text-black/80 dark:text-white/60  '>
+              {`${message.sender.firstName} ${message.sender.lastName},`}
+            </span>
+            <span className=' text-xs text-black/90 dark:text-white/60 mt-1 ' >
+              {moment(message.timestamp).format("LT")}
+            </span>
+          </div>
+        ) :
+          <div className=' text-xs text-white/60 mt-1 ' >
+            {moment(message.timestamp).format("LT")}
+          </div>
+        }
+
+
+      </div>
+    );
+  };
+
 
   const checkIfImage = (filePath) => {
     const imageRegex =
@@ -154,6 +272,7 @@ const MessageContainer = () => {
             </div>
           )}
           {selectedChatType === "contact" && renderDMMessages(message)}
+          {selectedChatType === "channel" && renderChannelMessages(message)}
         </div>
       )
     });
@@ -182,17 +301,17 @@ const MessageContainer = () => {
             <div className='flex gap-5 top-0 mt-5  ' >
               <button className=' w-fit rounded-full p-1 hover:bg-black/20 cursor-pointer transition-all duration-300  '
                 onClick={() => { downloadFile(imageURL) }}>
-                <IoMdDownload className='text-2xl'/>
+                <IoMdDownload className='text-2xl' />
               </button>
             </div>
 
             <div className='flex gap-5 fixed top-0 mt-5  ' >
               <button className=' w-fit rounded-full  hover:bg-black/20 cursor-pointer transition-all duration-300  '
-                onClick={() => { 
+                onClick={() => {
                   setShowImage(false);
                   setImageURL(null);
-                 }}>
-                  
+                }}>
+
                 <IoMdClose className='text-2xl' />
               </button>
             </div>

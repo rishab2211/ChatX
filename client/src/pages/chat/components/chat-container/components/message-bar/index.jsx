@@ -41,17 +41,6 @@ const MessageBar = () => {
     const handleSendMessage = async () => {
         if (selectedChatType === "contact") {
 
-            // console.log("Message to send:", message);
-
-
-            // console.log("Sending message:", {
-            //     sender: userInfo.id,
-            //     content: message,
-            //     recipient: selectedChatData._id,
-            //     messageType: "text",
-            //     fileUrl: undefined,
-            // });
-
             socket.emit("sendMessage", {
                 sender: userInfo.id,
                 content: message,
@@ -59,9 +48,24 @@ const MessageBar = () => {
                 messageType: "text",
                 fileUrl: undefined
             });
-
-            setMessage("");
+        }else if(selectedChatType==="channel"){
+            console.log({
+                sender: userInfo.id,
+                content:message,
+                messageType: "text",
+                fileUrl: undefined,
+                channelId : selectedChatData._id
+            });
+            
+            socket.emit("send-channel-message",{
+                sender: userInfo.id,
+                content:message,
+                messageType: "text",
+                fileUrl: undefined,
+                channelId : selectedChatData._id
+            });
         }
+        setMessage("");
     }
 
     const toggleEmojiPicker = (e) => {
@@ -99,7 +103,15 @@ const MessageBar = () => {
                             fileUrl: response.data.filePath
                         });
                     }
-                }
+                else if(selectedChatType==="channel"){
+                    socket.emit("send-channel-message",{
+                        sender: userInfo.id,
+                        content:undefined,
+                        messageType: "file",
+                        fileUrl: response.data.filePath,
+                        channelId : selectedChatData._id
+                    })
+                }}
             }
 
 

@@ -1,6 +1,6 @@
 import { Server as SocketIOServer } from "socket.io";
 import Messages from "./models/MessagesModel.js";
-
+import Channel from "./models/ChannelModel.js"
 const setupSocket = (server) => {
   const io = new SocketIOServer(server, {
     cors: {
@@ -49,6 +49,57 @@ const setupSocket = (server) => {
       }
   };
 
+  const sendChannelMessage= async (message)=>{
+    const {channelId, sender, content, messageType, fileUrl} = message;
+
+    const createdMessage = await Messages.create({
+      sender,
+      recipient:null,
+      content,
+      messageType,
+      timestamp: new Date(),
+      fileUrl,
+
+    });
+       
+
+    const messageData = await Messages.findById(createdMessage._id).populate("sender","id email firstName lastName image color").exec();
+
+    
+    
+    await Channel.findByIdAndUpdate(channelId,
+      {
+        $push: {messages: createdMessage._id},
+      }
+    );
+
+    const channel = await Channel.findById(channelId).populate("members");
+
+    const finalData = {...messageData._doc, channelId: channel._id};
+
+    console.log(finalData);
+    
+
+    if(channel && channel.members){
+      console.log("channel members : "+channel.members);
+      
+      channel.members.forEach((members)=>{
+        const memberSocketId = userSocketMap.get(members._id.toString());
+        console.log("membersSocket id :"+memberSocketId);
+        
+
+        if(memberSocketId){
+          io.to(memberSocketId).emit("recieve-channel-message",finalData);
+        }
+                
+      });
+      const adminSocketId = userSocketMap.get(channel.admin._id.toString());
+      if(adminSocketId){
+        io.to(adminSocketId).emit("recieve-channel-message",finalData);
+      }
+    }
+  }
+
   io.on("connection", (socket) => {
     const userId = socket.handshake.query.userId;
     if (userId) {
@@ -62,6 +113,7 @@ const setupSocket = (server) => {
       console.log("Message received on server:", message);
       sendMessage(message); 
   });
+  socket.on("send-channel-message",sendChannelMessage);
   
     socket.on("disconnect", () => disconnect(socket));
   });

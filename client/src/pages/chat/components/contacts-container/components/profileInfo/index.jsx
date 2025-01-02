@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { useAppStore } from '../../../../../../store'
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST, LOGOUT_ROUTE } from '../../../../../../utils/constants';

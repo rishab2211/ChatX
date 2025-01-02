@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/UserModel.js";
 import Messages from "../models/MessagesModel.js";
+import Channel from "../models/ChannelModel.js";
 
 export const searchContacts = async (req, res, next) => {
 
@@ -109,14 +110,12 @@ export const searchContacts = async (req, res, next) => {
       const users = await User.find(
         {_id :{ $ne: req.userId}},
         "firstName lastName _id email"
-      );
+      ); 
 
       const contacts = users.map((user)=>({
         label: user.firstName?
-        `${user.firstName} ${user.lastName}`:
-        `${user.email}`,
+        `${user.firstName} ${user.lastName}`: user.email,
         value: user._id
-
       }));
 
       return res.status(200).json({contacts});
@@ -127,3 +126,39 @@ export const searchContacts = async (req, res, next) => {
     }
   
   }
+
+
+
+export const createChannel = async(req, res, next) => {
+    try {
+        const { nameOfChannel, members } = req.body;
+
+        const userId = req.userId;
+
+        const admin = await User.findById(userId);
+        if(!admin) {
+            return res.status(400).send("admin user not found");
+        }
+
+        const validMembers = await User.find({ _id: { $in: members }});
+
+        if(validMembers.length !== members.length) {
+            return res.status(400).send("Some users are not valid users");
+        }
+
+        const newChannel = new Channel({
+            nameOfChannel,
+            members,
+            admin: userId
+        });
+
+        await newChannel.save();
+        return res.status(201).json({
+            channel: newChannel
+        });
+
+    } catch(err) {
+        console.log(err);
+        next(err); 
+    }
+}
