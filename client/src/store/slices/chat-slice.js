@@ -45,14 +45,18 @@ export const createChatSlice = (set, get) => ({
     });
   },
   addChannelInChannelList :(message)=>{
+    console.log("inside add channel in channel list");
+    
     const channels = get().channels;
+    console.log(message);
+    
     const data =channels.find((channel)=>channel._id===message.channelId);
     const index = channels.findIndex((channel)=>channel._id===message.channelId);
     if(index!==-1 && index!==undefined){
       channels.splice(index,1);
       channels.unshift(data);
     }
-    set({channels : [...channels]});
+    set({channels : [...channels]})
   },
 
   addContactsInDMContact:(message)=>{
@@ -64,8 +68,8 @@ export const createChatSlice = (set, get) => ({
     const formData= message.sender._id === userId? message.recipient: message.sender;
     const dmContacts = get().directMessagesContacts;
 
-    const data= dmContacts.findIndex((contact)=> contact._id===formId);
-
+    const data= dmContacts.find((contact)=> contact._id===formId);
+    const index = dmContacts.findIndex((contact)=>contact._id===formId);
     if(index!==-1 && index!==undefined){
       dmContacts.splice(index,1);
       dmContacts.unshift(data);

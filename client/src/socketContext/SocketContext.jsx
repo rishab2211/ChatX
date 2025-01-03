@@ -47,10 +47,13 @@ export const SocketProvider = ({ children }) => {
                     selectedChatData._id===message.recipient._id)
                 ){
                     console.log("message recieved : "+message);
+                    console.log("calling addmessage");
                     
                     addMessage(message);
                 }
-                addContactsInDMContact();
+                console.log("calling addcontactsinlist");
+                
+                addContactsInDMContact(message);
             };
 
             const handleRecieveChannelMessage = (message)=>{
@@ -59,19 +62,28 @@ export const SocketProvider = ({ children }) => {
                 if(selectedChatType!==undefined && selectedChatData._id === message.channelId){
                     addMessage(message);
                 }
-                addChannelInChannelList();
+                console.log("calling addchannellist");
+                
+                addChannelInChannelList(message);
                 
             }
 
             socket.current.on("recieveMessage", handleRecieveMessage);
             socket.current.on("recieve-channel-message",handleRecieveChannelMessage)
 
+            console.log("page re-rendered");
+            
 
             return () => {
                 socket.current.disconnect();
             }
         }
     }, [userInfo]);
+
+    const refreshPage = () => {
+        window.location.reload();
+    };
+    
 
     return (
         <SocketContext.Provider value={socket.current} >
