@@ -21,6 +21,7 @@ import { SEARCH_CONTACTS_ROUTE } from '../../../../../../utils/constants'
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST } from '../../../../../../utils/constants'
 import { useAppStore } from '../../../../../../store'
+import { getColor } from '../../../../../../lib/utils'
 const NewDM = () => {
 
     const [openNewContactModal, setOpenNewContactModal] = useState(false);
