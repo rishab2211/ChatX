@@ -23,4 +23,5 @@
   1. **MongoDB** : NoSQL database for storing user data and chat messages.
   2. **Mongoose** : for Object Data Modeling (ODM)
 
-# ( This project is still in the development phase ).
+## ( The development of this project is complete ).
+# (The documentation will be updated soon...).
