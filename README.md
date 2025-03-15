@@ -1,6 +1,6 @@
 # ChatX : Realtime chat application 
 deployed link :
-[ChatX](https://chat-x-gilt.vercel.app/)
+[ChatX](https://chatx-snowy.vercel.app/)
 
 # Project description :
 ## What ChatX does ?
