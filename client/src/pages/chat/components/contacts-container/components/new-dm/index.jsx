@@ -22,6 +22,7 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST } from '../../../../../../utils/constants'
 import { useAppStore } from '../../../../../../store'
 import { getColor } from '../../../../../../lib/utils'
+import { animationDefaultOptionsChatLoading } from '../../../../../../App'
 const NewDM = () => {
 
     const [openNewContactModal, setOpenNewContactModal] = useState(false);
@@ -97,11 +98,11 @@ const NewDM = () => {
                             <div className=' flex-1 md:flex flex-col m-5 justify-center items-center duration-1000 transition-all ' >
                                 <Lottie
                                     isClickToPauseDisabled={true}
-                                    height={100}
-                                    width={100}
-                                    options={animationDefaultOptions}
+                                    height={200}
+                                    width={200}
+                                    options={animationDefaultOptionsChatLoading}
                                 />
-                                <div className=' text-opacity-80 dark:text-white flex flex-col gap-10 items-center mt-5 lg:text-2xl text-xl transition-all duration-300 text-center  ' >
+                                <div className=' text-opacity-80 dark:text-white flex flex-col items-center lg:text-2xl text-xl transition-all duration-300 text-center  ' >
                                     <h4 className='poppins-medium' >
                                         Searching<span className='text-purple-500' >...</span>
                                     </h4>

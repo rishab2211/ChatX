@@ -127,13 +127,13 @@ const ProfileIndex = () => {
 
   return (
     <>
-      <div className="  h-[100vh] flex items-center justify-center flex-col gap-10 ">
-        <div className="flex  flex-col gap-10 w-[80vw] md:w-max border p-4 shadow-xl rounded-2xl  ">
+      <div className="  h-[100vh] w-auto flex flex-col items-center justify-center ">
+        <div className="flex  flex-col gap-1  border p-4 shadow-xl rounded-2xl  ">
           <div className="flex justify-between" >
             <IoArrowBack onClick={handleNavigate} className="text-4xl lg:text-6xl cursor-pointer " />
             <ModeToggle/>
           </div>
-          <div className=" grid grid-cols-2 ">
+          <div className=" flex items-center flex-col gap-4 md:flex-row">
             <div
               className=" h-32 w-32 md:w-48 md:h-48 relative flex items-center justify-center "
               onMouseEnter={() => setHovered(true)}
@@ -171,36 +171,34 @@ const ProfileIndex = () => {
               <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageChange} name="profile-image" accept=".png, .jpg, .jpeg, .svg, .webp" />
             </div>
             <div>
-              <div className=" min-w-32 md:min-w-64 flex flex-col gap-5 items-center">
-                <div className="w-full ">
+              <div className=" flex flex-col gap-5 items-center">
+                <div className=" flex flex-col gap-4 ">
                   <input
                     placeholder="Email"
                     type="email"
                     disabled
                     value={userInfo.email}
-                    className="rounded-lg p-6 border"
+                    className="rounded-lg p-5 border"
                   />
-                </div>
-                <div className="w-full">
+                
                   <input
                     placeholder="First Name"
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="rounded-lg dark:bg-slate-900 bg-slate-50 p-6 border"
+                    className="rounded-lg dark:bg-slate-900 bg-slate-50 p-5 border"
                   />
-                </div>
-                <div className="w-full">
+                
                   <input
                     placeholder="Last Name"
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="rounded-lg p-6 dark:bg-slate-900 bg-slate-50 border"
+                    className="rounded-lg p-4 dark:bg-slate-900 bg-slate-50 border"
                   />
                 </div>
 
-                <div className="w-full flex gap-5">
+                <div className="flex gap-5">
                   {colors.map((color, index) => (
                     <div
                       className={` ${color} h-8 w-8 rounded-full hover:cursor-pointer transition-all duration-300
@@ -211,16 +209,16 @@ const ProfileIndex = () => {
                     ></div>
                   ))}
                 </div>
-              </div>
-            </div>
-            <div className="w-full">
-              <button
+                <button
                 className="text-white font-semibold text-lg h-16 w-full bg-purple-600 hover:bg-purple-800 p-2 transition-all duration-300 rounded-lg"
                 onClick={saveChanges}
               >
                 Save Changes
               </button>
+              </div>
+              
             </div>
+            
           </div>
         </div>
       </div>

@@ -156,7 +156,7 @@ const AuthIndex = () => {
     // main outer div
     <div className=" h-[100vh] w-[100vw] flex dark:bg-white items-center justify-center ">
       {/* // container div containing all the fields, buttons, texts */}
-      <div className=" h-[80vh] bg-white dark:bg-white border-2 border-slate-200 text-opacity-90 shadow-2xl w-[80vw] md:w-[90vw] lg:w-[70vw] rounded-3xl p-2 grid xl:grid-cols-2">
+      <div className=" h-[60vh] sm:h-[80vh] bg-white dark:bg-white border-2 border-slate-200 text-opacity-90 shadow-2xl w-[80vw] md:w-[90vw] lg:w-[70vw] rounded-3xl p-2 grid xl:grid-cols-2">
         {/* Upper texts and icon div */}
         <div className="flex items-center justify-center flex-col">
           <div className="flex items-center justify-center">
@@ -169,7 +169,7 @@ const AuthIndex = () => {
         {/* main fields and buttons div  */}
         <div className=" flex items-center justify-center w-full ">
           {/* login and signup tabs div */}
-          <Tabs className="w-3/4" defaultValue="login" onValueChange={Ready} >
+          <Tabs className="w-full  sm:w-3/4" defaultValue="login" onValueChange={Ready} >
             <TabsList className={`bg-transparent rounded-none w-full`}>
               {/* login tab */}
               <TabsTrigger

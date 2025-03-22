@@ -9,6 +9,7 @@ import { GET_USER_INFO } from "./utils/constants";
 import { ThemeProvider } from "./components/ui/theme-provider"
 import Lottie from 'react-lottie';
 import animationData from "../src/assets/customer-service-chat.json";
+
 export const animationDefaultOptionsChatLoading = {
   loop:true,
   autoplay:true,
