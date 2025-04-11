@@ -29,8 +29,8 @@
 ---
 
 ## 🖼️ Demo / Screenshots
+![ChatX Screenshot 1](server/assets/chatx-demo.gif)
 
-`![ChatX Screenshot 1](server/assets/chatx-demo.gif)`
 
 
 ---
