@@ -1,46 +1,41 @@
 import { compare } from "bcrypt";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
-import { renameSync, unlinkSync } from "fs"
-
-
-// Maximum age of any session token created (3 days)
-const maxAge = 3 * 24 * 60 * 60 * 1000;
+import { renameSync, unlinkSync } from "fs";
 
 // Creating JWT token with expiration of 3 days
+const maxAge = 3 * 24 * 60 * 60 * 1000;
 const createToken = (email, userId) => {
+  // sign user jwt with max-age
   return jwt.sign({ email, userId }, process.env.JWT_KEY, {
     expiresIn: maxAge,
   });
 };
 
-// signup logic
-export const signup = async (req, res, next) => {
+// signup controller
+export const signup = async (req, res) => {
   try {
-    // destructuring the email and password object from request's body
+    // destructuring email, password from request body
     const { email, password } = req.body;
 
     // if email or password not available
     if (!email || !password) {
-      // sending status code 400(server is unable to process a request due to a client error)
-
+      // client error or invalid info provided
       return res.status(400).send("Email and Password is required");
     }
 
-    // Checking if the user already exist
+    // check existing user
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      // sending status code 409(indicates conflict between user's request and current web server state)
-      // here, it indicates the user already exists
+      // conflic with resource (Which means it already exist)
       return res.status(409).send("Email already exists");
     }
 
-    // Creating user in the DB with the entered email and password
+    // Creating user in the DB
     const user = await User.create({ email, password });
 
-    // setting cookie in the response with the "jwt" argument as the cookie’s name.
-    // and creating token immedaitely with 3 days expiration
+    // setting JWT token as cookie
     res.cookie("jwt", createToken(email, user.id), {
       maxAge,
       secure: true,
@@ -59,45 +54,38 @@ export const signup = async (req, res, next) => {
       },
     });
   } catch (err) {
-    console.log(err.message);
     // Server is unable to fulfill a request due to an unexpected condition.
-    return res.status(500).send("Internal server error rishabraj");
+    return res.status(500).send("Internal server error", err.message);
   }
 };
 
-// Login logic
-export const login = async (req, res, next) => {
+// Login controller
+export const login = async (req, res) => {
   try {
-    // destructuring the email and password object from request's body
+    // destructuring fields
     const { email, password } = req.body;
 
-    // if email or password not available
+    // check if fields exist
     if (!email || !password) {
-      // sending status code 400(server is unable to process a request due to a client error)
+      // client error
       return res.status(400).send("Email and Password are required");
     }
 
-    // Finding user with the entered email
+    // check if user exists
     const user = await User.findOne({ email });
-
-    // If user does not exist in the DB
     if (!user) {
       // send 404 code with message
       return res.status(404).send("User with the given email not found.");
     }
 
-    // if found then proceed,
-
-    // Compare entered password with the actual password stored in DB
+    // if found,
+    // check if password is correct
     const auth = await compare(password, user.password);
-
-    // if Auth fails sends unable to process request due to client error
     if (!auth) {
       return res.status(400).send("Password is not correct");
     }
 
-    // setting cookie in the response with the "jwt" argument as the cookie’s name.
-    // and creating token immedaitely with 3 days expiration
+    // setting JWT token as cookie
     res.cookie("jwt", createToken(email, user.id), {
       maxAge,
       secure: true,
@@ -115,55 +103,58 @@ export const login = async (req, res, next) => {
       },
     });
   } catch (err) {
-    console.log(err.message);
     // If something goes wrong
-    return res.status(500).send("Internal server error");
+    return res.status(500).send("Internal server error", err.message);
   }
 };
 
-
-
-export const getUserInfo = async (req, res, next) => {
+export const getUserInfo = async (req, res) => {
   try {
-
+    // find user in DB
     const userData = await User.findById(req.userId);
     if (!userData) {
       return res.status(404).send("User with the given ID not found.");
     }
 
+    // if found return details
     return res.status(200).json({
-
       id: userData.id,
       email: userData.email,
       firstName: userData.firstName,
       lastName: userData.lastName,
       profileSetup: userData.profileSetup,
-      image: userData.image
+      image: userData.image,
     });
   } catch (err) {
-    console.log(err.message);
     // If something goes wrong
-    return res.status(500).send("Internal server error");
+    return res.status(500).send("Internal server error", err.message);
   }
 };
 
-
-export const updateProfile = async (req, res, next) => {
+export const updateProfile = async (req, res) => {
   try {
+    // destruct info from request
+    const { userId, firstName, lastName, color } = req.body;
 
-    const { userId } = req;
-    const { firstName, lastName, color } = req.body;
-
+    // validation - exist
     if (!firstName || !lastName) {
       return res.status(400).send("Firstname, lastname is required.");
     }
 
-    const userData = await User.findByIdAndUpdate(userId, {
-      firstName, lastName, color, profileSetup: true
-    }, { new: true, reValidators: true })
+    // find the user by id and update
+    const userData = await User.findByIdAndUpdate(
+      userId,
+      {
+        firstName,
+        lastName,
+        color,
+        profileSetup: true,
+      },
+      { new: true, reValidators: true }
+    );
 
+    // if successfull send the information
     return res.status(200).json({
-
       id: userData.id,
       email: userData.email,
       firstName: userData.firstName,
@@ -178,31 +169,31 @@ export const updateProfile = async (req, res, next) => {
 
 export const addProfileImage = async (req, res, next) => {
   try {
+
+    // validate file - exist
     if (!req.file) {
       return res.status(400).send("File is required");
     }
 
-    console.log("File uploaded:", req.file.path);
-
-
+    // give name to file with current time
     const date = Date.now();
     let fileName = "uploads/profiles/" + date + req.file.originalname;
     renameSync(req.file.path, fileName);
 
-    const updatedUser = await User.findByIdAndUpdate(req.userId, { image: fileName }, { new: true, runValidators: true });
+    // update user field in the db
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      { image: fileName },
+      { new: true, runValidators: true }
+    );
 
-    return (res.status(200).json(
-      { image: updatedUser.image })
-    )
+    return res.status(200).json({ image: updatedUser.image });
   } catch (err) {
-    console.log(err.message);
-
+    return res.status(422).send("Failed to upload profile image");
   }
 };
 
-
 export const removeProfileImage = async (req, res, next) => {
-
   try {
     const { userId } = req;
     const user = await User.findById(userId);
@@ -218,26 +209,18 @@ export const removeProfileImage = async (req, res, next) => {
     user.image = null;
     await user.save();
 
-    return res.status(200).send("Profile image removed succesfully")
+    return res.status(200).send("Profile image removed succesfully");
   } catch (err) {
     console.log(err.message);
-
   }
-
-}
-
-
+};
 
 export const logOut = async (req, res, next) => {
-
   try {
+    res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None" });
 
-    res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None" })
-
-    return res.status(200).send("Logout successful")
+    return res.status(200).send("Logout successful");
   } catch (err) {
     console.log(err.message);
-
   }
-
-}
+};
