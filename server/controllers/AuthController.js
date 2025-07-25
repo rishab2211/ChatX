@@ -1,7 +1,9 @@
 import { compare } from "bcrypt";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
-import { renameSync, unlinkSync } from "fs";
+import { unlinkSync } from "fs";
+import fs from 'fs/promises';
+import path from 'path';
 
 // Creating JWT token with expiration of 3 days
 const maxAge = 3 * 24 * 60 * 60 * 1000;
@@ -55,7 +57,7 @@ export const signup = async (req, res) => {
     });
   } catch (err) {
     // Server is unable to fulfill a request due to an unexpected condition.
-    return res.status(500).send("Internal server error", err.message);
+    return res.status(500).send("Internal server error");
   }
 };
 
@@ -92,6 +94,7 @@ export const login = async (req, res) => {
       sameSite: "None",
     });
 
+
     // Login successful
     return res.status(200).json({
       user: {
@@ -104,7 +107,7 @@ export const login = async (req, res) => {
     });
   } catch (err) {
     // If something goes wrong
-    return res.status(500).send("Internal server error", err.message);
+    return res.status(500).send("Internal server error");
   }
 };
 
@@ -127,7 +130,7 @@ export const getUserInfo = async (req, res) => {
     });
   } catch (err) {
     // If something goes wrong
-    return res.status(500).send("Internal server error", err.message);
+    return res.status(500).send("Internal server error");
   }
 };
 
@@ -167,29 +170,54 @@ export const updateProfile = async (req, res) => {
   }
 };
 
+
 export const addProfileImage = async (req, res, next) => {
+  // Validate that a file was uploaded by multer
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded." });
+  }
+
+
+  const uploadDir = 'uploads/profiles';
+  // Create a unique filename using a timestamp and the original file's extension
+  const fileExtension = path.extname(req.file.originalname);
+  const newFileName = `${Date.now()}${fileExtension}`;
+  const newFilePath = path.join(uploadDir, newFileName);
+
   try {
+    // Ensure the upload directory exists, creating it if necessary
+    await fs.mkdir(uploadDir, { recursive: true });
 
-    // validate file - exist
-    if (!req.file) {
-      return res.status(400).send("File is required");
-    }
+    // Asynchronously move the file from its temporary path to the final destination
+    await fs.rename(req.file.path, newFilePath);
 
-    // give name to file with current time
-    const date = Date.now();
-    let fileName = "uploads/profiles/" + date + req.file.originalname;
-    renameSync(req.file.path, fileName);
-
-    // update user field in the db
+    // Update the user document in the database
     const updatedUser = await User.findByIdAndUpdate(
       req.userId,
-      { image: fileName },
+      { image: newFilePath }, // Store the full path
       { new: true, runValidators: true }
     );
 
+    if (!updatedUser) {
+        // If the user wasn't found, clean up the uploaded file
+        await fs.unlink(newFilePath);
+        return res.status(404).json({ message: "User not found."});
+    }
+
     return res.status(200).json({ image: updatedUser.image });
+
   } catch (err) {
-    return res.status(422).send("Failed to upload profile image");
+    // 6. If any error occurs (e.g., DB fails), attempt to clean up the uploaded file
+    // to prevent orphaned files.
+    try {
+      await fs.unlink(newFilePath);
+    } catch (cleanupErr) {
+      // Log the cleanup error, but proceed to call next() with the original error
+      console.error("Error during file cleanup:", cleanupErr);
+    }
+    
+    // 7. Pass the original error to the next middleware for centralized handling
+    next(err);
   }
 };
 
@@ -211,7 +239,7 @@ export const removeProfileImage = async (req, res, next) => {
 
     return res.status(200).send("Profile image removed succesfully");
   } catch (err) {
-    console.log(err.message);
+    console.error(err.message);
   }
 };
 
@@ -221,6 +249,6 @@ export const logOut = async (req, res, next) => {
 
     return res.status(200).send("Logout successful");
   } catch (err) {
-    console.log(err.message);
+    console.error(err.message);
   }
 };

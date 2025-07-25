@@ -8,35 +8,23 @@ import ChatContainer from './components/chat-container';
 
 const ChatIndex = () => {
 
-  const {userInfo, selectedChatType} = useAppStore();
+  const { userInfo, selectedChatType } = useAppStore();
 
   const navigate = useNavigate();
 
-  useEffect(()=>{
-    if(!userInfo.profileSetup){
+  useEffect(() => {
+    if (!userInfo.profileSetup) {
       toast("Please setup profile to continue.");
       navigate("/profile");
     }
-  },[userInfo, navigate]);
-
-  // useEffect(()=>{
-  //   console.log(selectedChatType);
-    
-  // },[])
-
+  }, [userInfo, navigate]);
 
   return (
-    <div className='flex h-[100vh] w-[100vw] text-white overflow-hidden  ' >
-
-     
-      <ContactsContainer/>
-
-      
+    <div className='flex h-[100vh] w-[100vw] text-white overflow-hidden' >
+      <ContactsContainer />
       {
-        selectedChatType === undefined?(<EmptyChatContainer/>):(<ChatContainer/>)
+        selectedChatType === undefined ? (<EmptyChatContainer />) : (<ChatContainer />)
       }
-   
-      
     </div>
   )
 }

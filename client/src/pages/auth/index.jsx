@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ChatIcon from "../../assets/ChatIcon.png";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -10,24 +10,30 @@ import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../../store";
 
 const AuthIndex = () => {
-  // Email state manage
+  // Email and password state variables for signup and login
   const [email, setEmail] = useState("");
-  // Password state manage
   const [password, setPassword] = useState("");
-  // Confirm password state manage
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // useNavigate instance 
+  // Using useNavigate hook from react-router-dom to navigate between routes
   const navigate = useNavigate();
 
-  const { setUserInfo } = useAppStore();
+  // Using useAppStore to manage global state for user information
+  const { userInfo, setUserInfo } = useAppStore();
 
 
-  // Validating signup and responding accordingly with toast notification
+  // Function to reset the input fields
+  // This function clears the email, password, and confirm password fields
+  function Ready() {
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+  };
+
+  // Function to validate signup form inputs
   const validateSignup = () => {
     // if email and password field is empty
     if (!email.length && !password.length) {
-      // Toast Notification
       toast.error("Email & Password is requried");
       return false;
     }
@@ -46,48 +52,48 @@ const AuthIndex = () => {
       toast.error("Password and Confirm password should be same");
       return false;
     }
+
+    // if all fields are filled correctly then return true
     return true;
   };
 
-
+  // Function to handle signup
   const handleSignup = async () => {
 
+    // Validating signup and responding accordingly with toast notification
     if (validateSignup()) {
       try {
-        const response = await apiClient.post(
-          // If validation is successful then, sending POST request to this route
-          SIGNUP_ROUTE,
-          // Data
-          { email, password },
-          // Ensures cookies are included in the request
-          { withCredentials: true }
+
+        // POST request to the SIGNUP_ROUTE with email and password
+        // withCredentials: true ensures that cookies are included in the request
+        const response = await apiClient.post(SIGNUP_ROUTE, { email, password }, { withCredentials: true }
         );
-        // notification on succsessful login
+
+        // notification on successful signup
         toast.success("Signup successful");
+
         // Clear input fields
         Ready();
 
+        // If the response is successful and contains user data, navigate to profile page
         if (response.status === 201) {
           setUserInfo(response.data.user)
           navigate("/profile");
         }
 
       } catch (error) {
-        // showing error mesage as toast notification
+        // error message as toast notification if validation fails
         toast.error(error.message);
-
       }
-
     }
-
   };
 
 
-  // Validating signup and responding accordingly with toast notification
+  // Function to validate login form inputs
+  // This function checks if the email and password fields are filled correctly
   const validateLogin = () => {
     // if email and password field is empty
     if (!email.length && !password.length) {
-      // Toast Notification
       toast.error("Email & Password is requried");
       return false;
     }
@@ -101,43 +107,36 @@ const AuthIndex = () => {
       toast.error("Password is requried");
       return false;
     }
+
+    // if all fields are filled correctly then return true
     return true;
   };
 
-  // fn used when everytime user clicks login or signup tab button then it refeshes all the fields
-  function Ready() {
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
-  };
-
-
-
   const handleLogin = async () => {
+
+    // Validating login and responding accordingly with toast notification
+    // If validation is successful then, sending POST request to LOGIN_ROUTE with email and password
     if (validateLogin()) {
       try {
         const response = await apiClient.post(
-          // If validation is successful then, sending POST request to this route
+          // Endpoint for login
           LOGIN_ROUTE,
           // Data
           { email, password },
           // Ensures cookies are included in the request
           { withCredentials: true }
         );
-        // notification on succsessful login
-        toast.success("Login successful");
-        // Clear input fields
-        Ready();
-
-        // console.log("RESPONSE DATA : "+response.data);
-        // console.log("RESPONSE DATA USER : "+response.data.user);
-
-        // console.log("RESPONSE DATA USER EMAIL : "+response.data.user.email);
-        // console.log("RESPONSE DATA USER ID : "+response.data.user.id);
-        // console.log("RESPONSE DATA USER PROFILESETUP : "+response.data.user.profileSetup);
 
 
-        if (response.data.user) {
+        // If the response is successful and contains user data, set user info and navigate to chat or profile page
+        // If the user has completed profile setup, navigate to chat page, otherwise navigate to profile
+        if (response.status === 200 && response.data.user) { 
+          toast.success("Login successful");
+
+
+          console.log("Login successful", response.data.user);
+          
+
           setUserInfo(response.data.user);
           if (response.data.user.profileSetup) {
             navigate("/chat");
@@ -145,13 +144,24 @@ const AuthIndex = () => {
             navigate("/profile");
           }
         }
+
+        // Clear input fields
+        Ready();
+
       } catch (error) {
-        // showing error mesage as toast notification
+        // If an error occurs during login, show an error message
         toast.error(error.message);
       }
     }
   };
 
+
+
+  useEffect(()=>{
+    console.log("User Info:", userInfo);
+  },[userInfo, setUserInfo])
+
+  
   return (
     // main outer div
     <div className=" h-[100vh] w-[100vw] flex dark:bg-white items-center justify-center ">
@@ -175,7 +185,7 @@ const AuthIndex = () => {
               <TabsTrigger
                 value="login"
                 className={` data-[state=active]:bg-transparent text-black dark:text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
-                
+
               >
                 Login
               </TabsTrigger>
@@ -184,7 +194,7 @@ const AuthIndex = () => {
               <TabsTrigger
                 value="signup"
                 className={` data-[state=active]:bg-transparent text-black dark:text-black text-opacity-90 border-b-2 rounded-none data-[state=active]:text-black data-[state=active]:font-semibold data-[state=active]:border-b-purple-500  w-full p-3 transition-all duration-300 `}
-                
+
               >
                 Signup
               </TabsTrigger>
@@ -248,4 +258,3 @@ const AuthIndex = () => {
 };
 
 export default AuthIndex;
-

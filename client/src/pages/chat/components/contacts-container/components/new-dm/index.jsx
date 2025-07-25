@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
     Tooltip,
     TooltipContent,
@@ -54,12 +54,6 @@ const NewDM = () => {
         }
     }
 
-
-    // useEffect(()=>{
-    //     console.log("chat type : "+Date.now()+selectedChatType);
-    //     console.log("chat data at "+Date.now()+selectedChatData)
-        
-    // },[selectedChatData,selectedChatType])
 
     const seletNewContact = (contact)=>{
         setOpenNewContactModal(false);

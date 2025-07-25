@@ -6,7 +6,6 @@ import EmojiPicker from "emoji-picker-react"
 import { useAppStore } from '../../../../../../store';
 import { useSocket } from '../../../../../../socketContext/SocketContext';
 import { UPLOAD_FILES_ROUTE } from '../../../../../../utils/constants';
-import apiClient from "../../../../../../lib/api-client"
 import apiCLient from '../../../../../../lib/api-client';
 const MessageBar = () => {
     const [message, setMessage] = useState("");

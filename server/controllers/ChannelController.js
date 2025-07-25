@@ -87,4 +87,3 @@ export const getChannelMessages = async(req,res,next)=>{
         
     }
 }
-

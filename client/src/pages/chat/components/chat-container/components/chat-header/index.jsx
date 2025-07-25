@@ -1,4 +1,3 @@
-import React from 'react';
 import { RiCloseFill } from "react-icons/ri";
 import { useAppStore } from '../../../../../../store';
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
