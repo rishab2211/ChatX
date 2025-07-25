@@ -1,26 +1,32 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '../../../../../../store'
 import moment from "moment"
-import apiClient from '../../../../../../lib/api-client'
+import apiCLient from '../../../../../../lib/api-client'
 import { GET_ALL_MESSAGES_ROUTE, GET_CHANNEL_MESSAGES, HOST } from '../../../../../../utils/constants'
 import { MdFolderZip, MdImage, MdPictureAsPdf, MdDescription } from "react-icons/md"
 import { IoMdDownload, IoMdClose } from "react-icons/io"
 import { FaSpinner } from "react-icons/fa"
 import { Avatar, AvatarFallback, AvatarImage } from '../../../../../../components/ui/avatar'
 import { getColor } from '../../../../../../lib/utils'
+import MessageBar from '../message-bar'
 
 const MessageContainer = () => {
+
+  // Refs for scrolling and image modal
   const scrollRef = useRef()
   const imageModalRef = useRef()
-  
-  const { 
-    selectedChatType, 
-    selectedChatData, 
-    userInfo, 
-    selectedChatMessages, 
-    setSelectedChatMessages 
+
+
+  // App store hooks for state management
+  const {
+    selectedChatType,
+    selectedChatData,
+    userInfo,
+    selectedChatMessages,
+    setSelectedChatMessages
   } = useAppStore()
-  
+
+  // State for managing image modal, file download, and loading/error states
   const [showImage, setShowImage] = useState(false)
   const [imageURL, setImageURL] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -37,9 +43,9 @@ const MessageContainer = () => {
   // Get file icon based on file type
   const getFileIcon = useCallback((filePath) => {
     if (!filePath) return <MdFolderZip />
-    
+
     const extension = filePath.split('.').pop()?.toLowerCase()
-    
+
     switch (extension) {
       case 'pdf':
         return <MdPictureAsPdf />
@@ -58,47 +64,47 @@ const MessageContainer = () => {
     }
   }, [])
 
-  // Format file size
-  const formatFileSize = useCallback((bytes) => {
-    if (!bytes) return ''
-    if (bytes === 0) return '0 Bytes'
-    
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }, [])
 
   // Enhanced download function with better error handling
   const downloadFile = useCallback(async (fileURL) => {
+
+    // Check if fileURL is valid
     if (!fileURL) return
-    
+
+    // Extract file name from URL
     const fileName = fileURL.split("/").pop()
+
+    // set fileURL to downloading files set to prevent duplicate downloads 
     setDownloadingFiles(prev => new Set([...prev, fileURL]))
 
     try {
-      const response = await apiClient.get(`${HOST}/${fileURL}`, {
+      // Fetch the file from the server
+      const response = await apiCLient.get(`${HOST}/${fileURL}`, {
         responseType: "blob",
         timeout: 30000 // 30 second timeout
       })
 
+      // --- Trigger Browser Download ---
+      // This uses a common browser trick to initiate a download without navigating away.
+      // 1. Convert the received file data (blob) into a temporary, local URL.
+      // 2. Programmatically create an invisible anchor (<a>) element.
+      // 3. Set the link's href to the temporary URL and set the 'download' attribute.
+      //    The 'download' attribute is what tells the browser to save the file instead of opening it.
+      // 4. Simulate a click on this link to open the browser's "Save As..." dialog.
       const urlBlob = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement("a")
-      
       link.href = urlBlob
       link.download = fileName
       link.style.display = 'none'
-      
       document.body.appendChild(link)
       link.click()
-      
+
       // Cleanup
       setTimeout(() => {
         document.body.removeChild(link)
         window.URL.revokeObjectURL(urlBlob)
       }, 100)
-      
+
     } catch (err) {
       console.error('Download failed:', err)
       setError(`Failed to download ${fileName}`)
@@ -128,16 +134,18 @@ const MessageContainer = () => {
   // Keyboard event handler for image modal
   useEffect(() => {
     const handleKeyDown = (event) => {
+      // Close image modal on Escape key press
       if (showImage && event.key === 'Escape') {
         handleCloseImage()
       }
     }
 
+    // Add event listener for keydown events
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [showImage, handleCloseImage])
 
-  // Enhanced message fetching with better error handling
+  // message fetching logic
   const fetchMessages = useCallback(async () => {
     if (!selectedChatData?._id) return
 
@@ -145,24 +153,29 @@ const MessageContainer = () => {
     setError(null)
 
     try {
-      let response
+      let response;
 
+      // Fetch messages based on selected chat type
       if (selectedChatType === "contact") {
-        response = await apiClient.post(
+        response = await apiCLient.post(
           GET_ALL_MESSAGES_ROUTE,
           { id: selectedChatData._id },
           { withCredentials: true }
         )
-        
+
+        // If the response contains stored messages, update the state
         if (response.data.storedMessages) {
           setSelectedChatMessages(response.data.storedMessages)
         }
       } else if (selectedChatType === "channel") {
-        response = await apiClient.get(
+
+        // Fetch channel messages
+        response = await apiCLient.get(
           `${GET_CHANNEL_MESSAGES}/${selectedChatData._id}`,
           { withCredentials: true }
         )
-        
+
+        // If the response contains messages, update the state
         if (response.data.messages) {
           setSelectedChatMessages(response.data.messages)
         }
@@ -179,10 +192,12 @@ const MessageContainer = () => {
     fetchMessages()
   }, [fetchMessages])
 
+
+  // Helper functions
   // Get contact display name
   const getContactDisplayName = useCallback((contact) => {
     if (!contact) return ''
-    
+
     if (contact.firstName && contact.lastName) {
       return `${contact.firstName} ${contact.lastName}`
     }
@@ -190,18 +205,17 @@ const MessageContainer = () => {
     if (contact.lastName) return contact.lastName
     return contact.email || 'Unknown User'
   }, [])
-
   // Get contact initials
   const getContactInitials = useCallback((contact) => {
     if (!contact) return '?'
-    
+
     if (contact.firstName) {
       return contact.firstName.charAt(0).toUpperCase()
     }
     return (contact.email || '?').charAt(0).toUpperCase()
   }, [])
 
-  // Enhanced DM message renderer
+  // DM message renderer
   const renderDMMessages = useCallback((message) => {
     const isOwnMessage = message.sender !== selectedChatData._id
     const isDownloading = downloadingFiles.has(message.fileUrl)
@@ -210,29 +224,27 @@ const MessageContainer = () => {
       <div className={`flex ${isOwnMessage ? "justify-end" : "justify-start"} mb-3`}>
         <div className="max-w-[70%] sm:max-w-[60%] md:max-w-[50%]">
           {message.messageType === "text" && (
-            <div className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
-                : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
-            } border rounded-2xl px-4 py-2 shadow-sm`}>
+            <div className={`${isOwnMessage
+              ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
+              : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
+              } border rounded-2xl px-4 py-2 shadow-sm`}>
               <p className="break-words">{message.content}</p>
             </div>
           )}
 
           {message.messageType === "file" && (
-            <div className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
-                : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
-            } border rounded-2xl p-3 shadow-sm`}>
+            <div className={`${isOwnMessage
+              ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
+              : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
+              } border rounded-2xl p-3 shadow-sm`}>
               {checkIfImage(message.fileUrl) ? (
-                <div 
+                <div
                   className="cursor-pointer group relative overflow-hidden rounded-lg"
                   onClick={() => handleImageClick(message.fileUrl)}
                 >
-                  <img 
-                    src={`${HOST}/${message.fileUrl}`} 
-                    className="max-w-full h-auto object-cover transition-transform duration-200 group-hover:scale-105" 
+                  <img
+                    src={`${HOST}/${message.fileUrl}`}
+                    className="max-w-full h-auto object-cover transition-transform duration-200 group-hover:scale-105"
                     alt="Shared image"
                     loading="lazy"
                   />
@@ -307,29 +319,27 @@ const MessageContainer = () => {
           )}
 
           {message.messageType === "text" && (
-            <div className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
-                : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
-            } border rounded-2xl px-4 py-2 shadow-sm`}>
+            <div className={`${isOwnMessage
+              ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
+              : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
+              } border rounded-2xl px-4 py-2 shadow-sm`}>
               <p className="break-words">{message.content}</p>
             </div>
           )}
 
           {message.messageType === "file" && (
-            <div className={`${
-              isOwnMessage
-                ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
-                : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
-            } border rounded-2xl p-3 shadow-sm`}>
+            <div className={`${isOwnMessage
+              ? "bg-[#8417ff]/10 text-[#8417ff] border-[#8417ff]/30"
+              : "bg-gray-100 dark:bg-[#2a2b33] text-gray-900 dark:text-white border-gray-200 dark:border-gray-600"
+              } border rounded-2xl p-3 shadow-sm`}>
               {checkIfImage(message.fileUrl) ? (
-                <div 
+                <div
                   className="cursor-pointer group relative overflow-hidden rounded-lg"
                   onClick={() => handleImageClick(message.fileUrl)}
                 >
-                  <img 
-                    src={`${HOST}/${message.fileUrl}`} 
-                    className="max-w-full h-auto object-cover transition-transform duration-200 group-hover:scale-105" 
+                  <img
+                    src={`${HOST}/${message.fileUrl}`}
+                    className="max-w-full h-auto object-cover transition-transform duration-200 group-hover:scale-105"
                     alt="Shared image"
                     loading="lazy"
                   />
@@ -423,7 +433,7 @@ const MessageContainer = () => {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 mb-2">{error}</p>
-          <button 
+          <button
             onClick={fetchMessages}
             className="px-4 py-2 bg-[#8417ff] text-white rounded-lg hover:bg-[#8417ff]/90 transition-colors"
           >
@@ -435,7 +445,7 @@ const MessageContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col overflow-auto relative">
       <div className="flex-1 overflow-y-auto p-4 space-y-1">
         {selectedChatMessages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
@@ -452,18 +462,18 @@ const MessageContainer = () => {
 
       {/* Enhanced Image Modal */}
       {showImage && imageURL && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={handleCloseImage}
           ref={imageModalRef}
         >
           <div className="relative max-w-[90vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <img 
+            <img
               src={`${HOST}/${imageURL}`}
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               alt="Preview"
             />
-            
+
             {/* Action buttons */}
             <div className="absolute top-4 right-4 flex gap-2">
               <button
@@ -488,6 +498,9 @@ const MessageContainer = () => {
           </div>
         </div>
       )}
+
+      {/* Message Bar */}
+      <MessageBar />
     </div>
   )
 }

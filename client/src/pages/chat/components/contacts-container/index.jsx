@@ -12,11 +12,13 @@ import CreateChannel from './components/create-channel'
 const ContactsContainer = () => {
   const { selectedChatType, directMessagesContacts, setDirectMessagesContacts, channels, setChannels } = useAppStore();
 
+
   const containerVisibility = selectedChatType === undefined
     ? 'w-full md:w-[35vw] lg:w-[30vw] xl:w-[20vw]'
     : ' md:block  hidden md:w-[35vw] lg:w-[30vw] xl:w-[20vw]';
 
   useEffect(() => {
+    // Fetch contacts and channels when component mounts
     const getContacts = async () => {
       const response = await apiCLient.get(
         GET_CONTACTS_ROUTES,
@@ -28,14 +30,12 @@ const ContactsContainer = () => {
       }
     }
 
+    // Fetch user channels
     const getUserChannels = async () => {
       const response = await apiCLient.get(
         GET_USER_CHANNELS,
         { withCredentials: true }
       );
-
-      console.log(response.data.channels);
-
 
       if (response.data.channels) {
         setChannels(response.data.channels);

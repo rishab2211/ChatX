@@ -133,10 +133,6 @@ const AuthIndex = () => {
         if (response.status === 200 && response.data.user) { 
           toast.success("Login successful");
 
-
-          console.log("Login successful", response.data.user);
-          
-
           setUserInfo(response.data.user);
           if (response.data.user.profileSetup) {
             navigate("/chat");
@@ -155,13 +151,6 @@ const AuthIndex = () => {
     }
   };
 
-
-
-  useEffect(()=>{
-    console.log("User Info:", userInfo);
-  },[userInfo, setUserInfo])
-
-  
   return (
     // main outer div
     <div className=" h-[100vh] w-[100vw] flex dark:bg-white items-center justify-center ">
