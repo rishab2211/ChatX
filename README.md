@@ -67,7 +67,7 @@ Follow these instructions to set up the project locally for development and test
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/rishab2211/ChatX.git](https://github.com/rishab2211/ChatX.git)
+    git clone chttps://github.com/rishab2211/ChatX.git
     cd ChatX
     ```
 
