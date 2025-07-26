@@ -1,8 +1,10 @@
 # ChatX - Realtime Chat Application 💬
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) **ChatX** is a feature-rich, real-time chat application built with modern web technologies. It allows users to connect via direct messages and group channels, share files, and customize their experience.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**🚀 Live Demo:** [**Try ChatX Now!**](https://chatx-snowy.vercel.app/)
+**ChatX** is a feature-rich, real-time chat application built with modern web technologies. It allows users to connect via direct messages and group channels, share files, and customize their experience.
+
+**🚀 Live Demo:** [**Try ChatX Now!**](https://chat-x-three-gamma.vercel.app/)
 
 ---
 
@@ -29,9 +31,8 @@
 ---
 
 ## 🖼️ Demo / Screenshots
-![ChatX Screenshot 1](server/assets/ChatX-demo.gif)
 
-
+![ChatX Demo GIF](server/assets/ChatX-demo.gif)
 
 ---
 
@@ -43,9 +44,8 @@
     * **Shadcn UI:** Reusable and accessible UI components.
     * **Zustand:** Minimalist global state management.
 * **Backend:**
-    * **Node.js:** JavaScript runtime environment.
-    * **Express.js:** Web application framework for Node.js.
-    * **Socket.IO:** (Or specify if using native WebSockets) For enabling real-time, bidirectional communication.
+    * **Node.js & Express.js:** For building the server-side API.
+    * **Socket.IO:** For enabling real-time, bidirectional communication.
 * **Database:**
     * **MongoDB:** NoSQL database for storing user data, messages, and channel information.
     * **Mongoose:** Object Data Modeling (ODM) library for MongoDB and Node.js.
@@ -54,50 +54,62 @@
 
 ## 🚀 Getting Started
 
-Follow these instructions to set up the project locally for development or testing.
+Follow these instructions to set up the project locally for development and testing.
 
 ### Prerequisites
 
 * **Node.js:** v18.x or later ([Download](https://nodejs.org/))
-* **npm, yarn, or pnpm:** Package manager (npm comes with Node.js)
-* **MongoDB:** A running MongoDB instance (local or cloud-based like MongoDB Atlas). Get the connection URI.
-* **Git:** ([Download](https://git-scm.com/))
+* **NPM or Yarn:** Package manager (NPM comes with Node.js)
+* **MongoDB:** A running MongoDB instance (local or cloud-based like MongoDB Atlas).
+* **Git:** Version control system ([Download](https://git-scm.com/))
 
 ### Installation & Setup
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/rishab2211/ChatX.git](https://github.com/rishab2211/ChatX.git) 
-    cd chatx-repo
+    git clone [https://github.com/rishab2211/ChatX.git](https://github.com/rishab2211/ChatX.git)
+    cd ChatX
     ```
 
-2.  **Install Backend Dependencies:**
+2.  **Install Server Dependencies:**
     ```bash
-    # Navigate to backend directory (adjust if monorepo structure differs)
-    cd server 
+    cd server
     npm install
-    # or yarn install / pnpm install
     ```
 
-3.  **Install Frontend Dependencies:**
+3.  **Install Client Dependencies:**
     ```bash
-    # Navigate to frontend directory (adjust if monorepo structure differs)
     cd ../client
     npm install
-    # or yarn install / pnpm install
-    cd ..
     ```
 
 4.  **Set up Environment Variables:**
-    * Create a `.env` file in your `server` (backend) directory.
-    * Copy the contents of `.env.example` (if provided) or add the necessary variables:
-        ```dotenv
-        PORT=5000 # Or any port you prefer for the backend
-        MONGODB_URI=your_mongodb_connection_string
-        JWT_SECRET=your_very_strong_jwt_secret_key
-        # Add any other required variables (e.g., Cloudinary keys for file uploads)
-        ```
-    * 
+
+    You need to create a `.env` file in both the `/server` and `/client` directories.
+
+    #### Server-Side (`/server/.env`)
+    Create a `.env` file in the `/server` folder and add the following, replacing the placeholder values:
+    ```env
+    # The port your back-end server will run on
+    PORT=3000
+
+    # A secret key for creating/verifying JSON Web Tokens (JWT) for authentication
+    # Replace "secret_key" with a long, random, and secure string
+    JWT_KEY="your_super_secret_key_here"
+
+    # The URL of your front-end application for CORS (Cross-Origin Resource Sharing)
+    ORIGIN="http://localhost:5173"
+
+    # The connection string for your MongoDB database
+    DB_URL="mongodb+srv://<user>:<password>@cluster.mongodb.net/yourDatabaseName"
+    ```
+
+    #### Client-Side (`/client/.env`)
+    Create a `.env` file in the `/client` folder and add the following:
+    ```env
+    # This variable tells your front-end application the address of your back-end server.
+    VITE_SERVER_URL=http://localhost:3000
+    ```
 
 5.  **Run the Backend Server:**
     ```bash
@@ -105,23 +117,23 @@ Follow these instructions to set up the project locally for development or testi
     npm run dev
     ```
 
-6.  **Run the Frontend Application:**
+6.  **Run the Frontend Application (in a new terminal):**
     ```bash
-    cd ../client
+    cd client
     npm run dev
     ```
 
-7.  **Access the Application:** Open your browser and navigate to the frontend URL (usually `http://localhost:3000` or `http://localhost:5173` for Vite/React).
+7.  **Access the Application:**
+    Open your browser and navigate to `http://localhost:5173` (or the port specified by Vite in your terminal).
 
 ---
 
 ## 📖 Usage
 
-1.  Register a new account or log in with existing credentials.
-2.  Update your profile information and picture via the settings/profile section.
-3.  Use the search bar to find other users.
-4.  Click on a user to start a direct message conversation.
-5.  Create new channels and add members from your contact list.
-6.  Join existing channels you are invited to.
-7.  Send text messages, emojis, images, or files in chats and channels.
-8.  Switch between Light/Dark/System themes in the settings.
+1.  **Register a new account** or log in with existing credentials.
+2.  **Update your profile** information and picture via the profile settings.
+3.  Use the **search bar** to find other users.
+4.  Click on a user to start a **direct message** conversation.
+5.  **Create new channels** and add members from your contact list.
+6.  Send text messages, emojis, images, or files in chats and channels.
+7.  Switch between **Light/Dark/System themes** in the settings.
