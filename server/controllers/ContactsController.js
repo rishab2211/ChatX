@@ -26,8 +26,6 @@ export const searchContacts = async (req, res) => {
     // The "i" flag makes the regex case-insensitive
     const regex = new RegExp(sanitizedSearchTerm, "i");
 
-    console.log(`Searching for contacts with term: ${sanitizedSearchTerm}`);
-
 
     // Find users in the database that match the regex
     const contacts = await User.find({
@@ -47,12 +45,25 @@ export const searchContacts = async (req, res) => {
 
 
 
-export const getContactsForDMList = async (req, res, next) => {
-  try {
-    let { userId } = req;
+// Function to get contacts for the Direct Message (DM) list
+// It retrieves the last message time for each contact and their details
+export const getContactsForDMList = async (req, res) => {
 
+
+  try {
+    // Extract userId from the request  
+    if (!req.userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    // Convert userId to a mongoose ObjectId for querying
+    let { userId } = req;
     userId = new mongoose.Types.ObjectId(userId);
 
+    // Aggregate messages to find contacts based on the last message sent or received
+    // The aggregation pipeline matches messages where the user is either the sender or recipient
+    // It sorts messages by timestamp, groups them by the other party (sender or recipient),
+    // and retrieves the last message time for each contact
+    // Finally, it looks up the user details for each contact and formats the response
     const contacts = await Messages.aggregate([
       {
         $match: {
@@ -104,75 +115,53 @@ export const getContactsForDMList = async (req, res, next) => {
       }
     ]);
 
+
+    // If no contacts are found, return an empty array  
+    if (!contacts || contacts.length === 0) {
+      return res.status(200).json({
+        contacts: []
+      });
+    }
+    // Return the contacts in the response
     return res.status(200).json({
       contacts
     });
   } catch (err) {
-    console.log(err.message);
     return res.status(500).json({
-      error: "Internal Server Error"
+      error: "Failed to retrieve contacts for DM list"
     });
   }
 };
 
 
-
+// Function to get all contacts excluding the current user
 export const getAllContacts = async (req, res, next) => {
 
   try {
 
+    // find the users in the database excluding the current user
     const users = await User.find(
       { _id: { $ne: req.userId } },
       "firstName lastName _id email"
     );
 
+    // If no users are found, return an empty array
+    if (!users || users.length === 0) {
+      return res.status(200).json({ contacts: [] });
+    }
+
+    // Map the users to a format suitable for the response
     const contacts = users.map((user) => ({
       label: user.firstName ?
         `${user.firstName} ${user.lastName}` : user.email,
       value: user._id
     }));
 
+    // Return the contacts in the response
     return res.status(200).json({ contacts });
 
   } catch (err) {
-    console.log(err.message);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send("Failed to retrieve contacts");
   }
 
-}
-
-
-
-export const createChannel = async (req, res, next) => {
-  try {
-    const { nameOfChannel, members } = req.body;
-
-    const userId = req.userId;
-
-    const admin = await User.findById(userId);
-    if (!admin) {
-      return res.status(400).send("admin user not found");
-    }
-
-    const validMembers = await User.find({ _id: { $in: members } });
-
-    if (validMembers.length !== members.length) {
-      return res.status(400).send("Some users are not valid users");
-    }
-
-    const newChannel = new Channel({
-      nameOfChannel,
-      members,
-      admin: userId
-    });
-
-    await newChannel.save();
-    return res.status(201).json({
-      channel: newChannel
-    });
-
-  } catch (err) {
-    console.log(err);
-    next(err);
-  }
 }

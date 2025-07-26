@@ -111,6 +111,8 @@ export const login = async (req, res) => {
   }
 };
 
+
+// Get user info controller
 export const getUserInfo = async (req, res) => {
   try {
     // find user in DB
@@ -134,6 +136,8 @@ export const getUserInfo = async (req, res) => {
   }
 };
 
+
+// Update profile controller
 export const updateProfile = async (req, res) => {
   try {
     // destruct info from request
@@ -170,7 +174,7 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-
+// Add profile image controller
 export const addProfileImage = async (req, res, next) => {
   // Validate that a file was uploaded by multer
   if (!req.file) {
@@ -199,56 +203,78 @@ export const addProfileImage = async (req, res, next) => {
     );
 
     if (!updatedUser) {
-        // If the user wasn't found, clean up the uploaded file
-        await fs.unlink(newFilePath);
-        return res.status(404).json({ message: "User not found."});
+      // If the user wasn't found, clean up the uploaded file
+      await fs.unlink(newFilePath);
+      return res.status(404).json({ message: "User not found." });
     }
 
     return res.status(200).json({ image: updatedUser.image });
 
   } catch (err) {
-    // 6. If any error occurs (e.g., DB fails), attempt to clean up the uploaded file
+    // If any error occurs (e.g., DB fails), attempt to clean up the uploaded file
     // to prevent orphaned files.
     try {
       await fs.unlink(newFilePath);
     } catch (cleanupErr) {
-      // Log the cleanup error, but proceed to call next() with the original error
-      console.error("Error during file cleanup:", cleanupErr);
+      console.error("Failed to clean up uploaded file:", cleanupErr);
     }
-    
-    // 7. Pass the original error to the next middleware for centralized handling
-    next(err);
+    return res.status(500).json({ message: "Failed to upload profile image." });
   }
 };
 
+// Remove profile image controller
 export const removeProfileImage = async (req, res, next) => {
   try {
+    // find the user by ID
+    if (!req.userId) {
+      return res.status(400).send("User ID is required");
+    }
     const { userId } = req;
     const user = await User.findById(userId);
-
     if (!user) {
       return res.status(404).send("User not found");
     }
 
+
+    // Check if the user has an image
+    if (!user.image) {
+      return res.status(400).send("No profile image to remove");
+    }
+    // Remove the image file from the server  
+    const imagePath = user.image;
+    // Ensure the file exists before attempting to unlink   
+    try {
+      await fs.access(imagePath);
+    } catch (err) {
+      return res.status(404).send("Profile image not found on server");
+    }
+    // Unlink the file
     if (user.image) {
       unlinkSync(user.image);
     }
 
+    // Update the user document to remove the image reference
     user.image = null;
     await user.save();
 
+    // Send a success response
     return res.status(200).send("Profile image removed succesfully");
   } catch (err) {
-    console.error(err.message);
+
+    return res.status(500).send("Failed to remove profile image");
+
   }
 };
 
+// Logout controller
 export const logOut = async (req, res, next) => {
   try {
+    // Clear the JWT cookie
     res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None" });
 
+    // Send a success response
     return res.status(200).send("Logout successful");
   } catch (err) {
-    console.error(err.message);
+    return res.status(500).send("Could not log out");
   }
 };

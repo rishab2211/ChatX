@@ -1,17 +1,18 @@
 import Messages from "../models/MessagesModel.js";
 import { mkdirSync, renameSync } from "fs";
+
+
 export const getMessages = async (req, res, next) => {
   try {
+    // Check if userId and recipientId are provided
     const user1 = req.userId;
-    // console.log("this is user1 id :"+user1);
-
     const user2 = req.body.id;
-    // console.log("this is user2 id :"+user2);
-
     if (!user1 || !user2) {
       return res.status(400).send("Both user IDs are required");
     }
 
+
+    // get the messages between the two users
     const storedMessages = await Messages.find({
       $or: [
         { sender: user1, recipient: user2 },
@@ -19,39 +20,48 @@ export const getMessages = async (req, res, next) => {
       ],
     }).sort({ timestamp: 1 });
 
+    // If no messages found, return an empty array
+    if (!storedMessages || storedMessages.length === 0) {
+      return res.status(200).json({
+        messages: []
+      });
+    }
+
+    // Return the messages in the response
     return res.status(200).json({
-      storedMessages,
+      storedMessages
     });
   } catch (err) {
-    console.log(err.message);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send("Could not fetch messages");
   }
 };
 
-export const uploadFile = async (req, res, next) => {
+
+// Function to upload a file
+export const uploadFile = async (req, res) => {
   try {
-    console.log("inside upload file");
 
+    // Check if the file is provided
     if (!req.file) {
-      res.status(400).send("file is required");
+      return res.status(400).send("file is required");
     }
-    console.log("file :", req.file);
 
+    // Create a directory for the file if it doesn't exist
     const date = Date.now();
     let fileDir = `uploads/files/${date}`;
-    console.log("file directory :" + fileDir);
     let fileName = `${fileDir}/${req.file.originalname}`;
-    console.log("file name : " + fileName);
 
+    // Ensure the directory exists
     mkdirSync(fileDir, { recursive: true });
-
+    // Rename the file to its new location
+    // This will move the file from the temporary location to the new directory
     renameSync(req.file.path, fileName);
 
+    // Return the file path in the response
     return res.status(200).json({
       filePath: fileName,
     });
   } catch (err) {
-    console.log(err.message);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send("Could not upload file");
   }
 };
