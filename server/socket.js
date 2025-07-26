@@ -19,7 +19,8 @@ const setupSocket = (server) => {
 
   // Function to handle user disconnection
   const disconnect = (socket) => {
-    console.log(`Client Disconnected : ${socket.id}`);
+    // Remove the user from the userSocketMap when they disconnect
+    // This ensures that the socket ID is no longer associated with the user ID
     for (const [userId, socketID] of userSocketMap.entries()) {
       if (socketID === socket.id) {
         userSocketMap.delete(userId);
