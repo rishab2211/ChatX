@@ -10,11 +10,11 @@ const channelSchema = new mongoose.Schema({
     messages:[{type:mongoose.Schema.ObjectId, ref:"Messages", required:false}],
     createdAt:{
         type: Date,
-        default: Date.now()
+        default: Date.now
     },
     updatedAt:{
         type: Date,
-        default: Date.now()
+        default: Date.now
     },
 });
 

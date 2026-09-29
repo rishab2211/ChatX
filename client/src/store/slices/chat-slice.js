@@ -90,11 +90,12 @@ export const createChatSlice = (set, get) => ({
     );
 
     // If the channel is found, remove it from its current position and add it to the top.
-    if (index !== -1 && index !== undefined) {
-      channels.splice(index, 1);
-      channels.unshift(data);
+    if (index !== -1 && index !== undefined && data) {
+      const updatedChannels = [...channels];
+      updatedChannels.splice(index, 1);
+      updatedChannels.unshift(data);
+      set({ channels: updatedChannels });
     }
-    set({ channels: [...channels] });
   },
 
   /**
@@ -115,17 +116,18 @@ export const createChatSlice = (set, get) => ({
     const dmContacts = get().directMessagesContacts;
 
     const index = dmContacts.findIndex((contact) => contact._id === formId);
+    const updatedDMContacts = [...dmContacts];
 
     // If contact already exists, move them to the top of the list.
     if (index !== -1) {
-      const data = dmContacts.find((contact) => contact._id === formId);
-      dmContacts.splice(index, 1);
-      dmContacts.unshift(data);
+      const data = updatedDMContacts.find((contact) => contact._id === formId);
+      updatedDMContacts.splice(index, 1);
+      updatedDMContacts.unshift(data);
     } else {
       // If it's a new contact, add them to the top of the list.
-      dmContacts.unshift(formData);
+      updatedDMContacts.unshift(formData);
     }
 
-    set({ directMessagesContacts: [...dmContacts] });
+    set({ directMessagesContacts: updatedDMContacts });
   },
 });

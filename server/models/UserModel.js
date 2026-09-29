@@ -1,5 +1,5 @@
 import { genSalt, hash } from "bcrypt";
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 
 // User schema definition and initialization with all the necesarry attributes
 const userSchema = new mongoose.Schema({
@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
 // Pre-save middleware for mongoose schema
 // Hashes password before saving it
 userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
   // salt is random string added before hashing, adds extra layer security
   const salt = await genSalt();
   this.password = await hash(this.password, salt);

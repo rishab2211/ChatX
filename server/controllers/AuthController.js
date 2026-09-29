@@ -1,7 +1,6 @@
 import { compare } from "bcrypt";
 import User from "../models/UserModel.js";
 import jwt from "jsonwebtoken";
-import { unlinkSync } from "fs";
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -24,6 +23,10 @@ export const signup = async (req, res) => {
     if (!email || !password) {
       // client error or invalid info provided
       return res.status(400).send("Email and Password is required");
+    }
+
+    if (password.length < 8) {
+      return res.status(400).send("Password must be at least 8 characters");
     }
 
     // check existing user
@@ -160,7 +163,7 @@ export const updateProfile = async (req, res) => {
         color,
         profileSetup: true,
       },
-      { new: true, reValidators: true }
+      { new: true, runValidators: true }
     );
 
     // if successfull send the information
@@ -252,9 +255,7 @@ export const removeProfileImage = async (req, res, next) => {
       return res.status(404).send("Profile image not found on server");
     }
     // Unlink the file
-    if (user.image) {
-      unlinkSync(user.image);
-    }
+    await fs.unlink(imagePath);
 
     // Update the user document to remove the image reference
     user.image = null;

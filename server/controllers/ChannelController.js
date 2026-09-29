@@ -13,7 +13,7 @@ export const createChannel = async (req, res) => {
         // check if the user exists
         const admin = await User.findById(userId);
         if (!admin) {
-            res.status(400).send("admin user not found");
+            return res.status(400).send("admin user not found");
         }
 
         // validation - members

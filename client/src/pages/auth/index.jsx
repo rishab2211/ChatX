@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useState } from "react";
 import ChatIcon from "../../assets/ChatIcon.png";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ const AuthIndex = () => {
   const navigate = useNavigate();
 
   // Using useAppStore to manage global state for user information
-  const { userInfo, setUserInfo } = useAppStore();
+  const { setUserInfo } = useAppStore();
 
 
   // Function to reset the input fields
@@ -33,22 +33,31 @@ const AuthIndex = () => {
   // Function to validate signup form inputs
   const validateSignup = () => {
     // if email and password field is empty
-    if (!email.length && !password.length) {
-      toast.error("Email & Password is requried");
+    if (!email.trim().length && !password.length) {
+      toast.error("Email & Password is required");
       return false;
     }
     // if email field is empty
-    if (!email.length) {
-      toast.error("Email is requried");
+    if (!email.trim().length) {
+      toast.error("Email is required");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast.error("Please enter a valid email address");
       return false;
     }
     // if password field is empty
     if (!password.length) {
-      toast.error("Password is requried");
+      toast.error("Password is required");
+      return false;
+    }
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
       return false;
     }
     // if password and confirm password are not same
-    if (password != confirmPassword) {
+    if (password !== confirmPassword) {
       toast.error("Password and Confirm password should be same");
       return false;
     }
@@ -83,28 +92,32 @@ const AuthIndex = () => {
 
       } catch (error) {
         // error message as toast notification if validation fails
-        toast.error(error.message);
+        toast.error(error.response?.data || error.message);
       }
     }
   };
 
 
   // Function to validate login form inputs
-  // This function checks if the email and password fields are filled correctly
   const validateLogin = () => {
     // if email and password field is empty
-    if (!email.length && !password.length) {
-      toast.error("Email & Password is requried");
+    if (!email.trim().length && !password.length) {
+      toast.error("Email & Password is required");
       return false;
     }
     // if email field is empty
-    if (!email.length) {
-      toast.error("Email is requried");
+    if (!email.trim().length) {
+      toast.error("Email is required");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      toast.error("Please enter a valid email address");
       return false;
     }
     // if password field is empty
     if (!password.length) {
-      toast.error("Password is requried");
+      toast.error("Password is required");
       return false;
     }
 
@@ -146,7 +159,7 @@ const AuthIndex = () => {
 
       } catch (error) {
         // If an error occurs during login, show an error message
-        toast.error(error.message);
+        toast.error(error.response?.data || error.message);
       }
     }
   };
@@ -222,7 +235,7 @@ const AuthIndex = () => {
               />
               <Input
                 placeholder="Password"
-                type="text"
+                type="password"
                 className="rounded-full p-6  dark:bg-white text-black"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
