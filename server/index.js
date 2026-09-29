@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/AuthRoutes.js";
 import { contactsRoutes } from "./routes/ContactRoutes.js";
@@ -25,6 +26,13 @@ requiredEnvVars.forEach((key) => {
 // express instance
 const app = express();
 
+// Security headers with helmet (configured to allow cross-origin static file loading)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 // Body parser with size limits
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
@@ -35,21 +43,20 @@ const port = process.env.PORT || 3001;
 // DB URL for connection
 const DbUrl = process.env.DB_URL;
 
-// CORS(Cross origin resource sharing) middleware
-// allow requests from a specific origin (set in the .env file) and to specify which HTTP methods are permitted.
+// CORS middleware
 app.use(
   cors({
     origin: [process.env.ORIGIN],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    // indicates cookies and http auth allowed in cross-origin requests
     credentials: true,
   })
 );
 
-// app.use("/uploads/profiles",express.static("uploads/profiles"))
-
-app.use('/uploads/profiles', express.static('uploads/profiles'));
-app.use("/uploads/files",express.static("uploads/files"));
+// Static file serving for uploads
+// Note: For cloud storage migration (e.g., Cloudinary or S3), file URLs will point directly
+// to cloud storage instead of local static disk folders.
+app.use("/uploads/profiles", express.static("uploads/profiles"));
+app.use("/uploads/files", express.static("uploads/files"));
 
 // parsing incoming requests making them accessible via res.cookies
 app.use(cookieParser());
@@ -67,16 +74,21 @@ const searchLimiter = rateLimit({
   message: { error: "Too many search requests, please slow down." },
 });
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // Rate limited route mounts
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
 app.use("/api/contacts/search", searchLimiter);
 
-// all authentication-related requests will be handles by authRoutes
+// API route mounts
 app.use("/api/auth", authRoutes);
-app.use("/api/contacts",contactsRoutes);
-app.use("/api/messages",messagesRoutes);
-app.use("/api/channels",channelRoutes);
+app.use("/api/contacts", contactsRoutes);
+app.use("/api/messages", messagesRoutes);
+app.use("/api/channels", channelRoutes);
 
 // 404 handler (after all defined routes)
 app.use((req, res) => {
@@ -91,12 +103,13 @@ app.use((err, req, res, next) => {
     error: err.message || "Internal server error",
   });
 });
-// server starting
+
+// Server starting
 const server = app.listen(port, () => {
   console.log(`Server is running at port ${port}`);
 });
 
-// app.use(setupSocket);
+// Socket.io initialization
 setupSocket(server);
 
 // Database connection
@@ -105,5 +118,4 @@ mongoose
   .then(() => {
     console.log("DB connection successful!");
   })
-  .catch((err) => console.log(err.message));
-
+  .catch((err) => console.error("DB connection error:", err.message));
