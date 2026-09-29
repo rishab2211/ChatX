@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import Logo from '../../../../assets/Logo'
 import ProfileInfo from './components/profileInfo'
 import NewDM from './components/new-dm'
@@ -6,6 +6,7 @@ import { ModeToggle } from '../../../../components/ui/mode-toggle'
 import { useAppStore } from '../../../../store'
 import apiCLient from '../../../../lib/api-client'
 import { GET_CONTACTS_ROUTES, GET_USER_CHANNELS } from '../../../../utils/constants'
+import { toast } from 'sonner'
 import ContactList from '../../../../components/ui/contact-list'
 import CreateChannel from './components/create-channel'
 
@@ -20,28 +21,37 @@ const ContactsContainer = () => {
   useEffect(() => {
     // Fetch contacts and channels when component mounts
     const getContacts = async () => {
-      const response = await apiCLient.get(
-        GET_CONTACTS_ROUTES,
-        { withCredentials: true }
-      );
+      try {
+        const response = await apiCLient.get(
+          GET_CONTACTS_ROUTES,
+          { withCredentials: true }
+        );
 
-      if (response.data.contacts) {
-        setDirectMessagesContacts(response.data.contacts)
+        if (response.data.contacts) {
+          setDirectMessagesContacts(response.data.contacts);
+        }
+      } catch (err) {
+        console.error("Failed to load contacts:", err);
+        toast.error("Failed to load contacts");
       }
-    }
+    };
 
     // Fetch user channels
     const getUserChannels = async () => {
-      const response = await apiCLient.get(
-        GET_USER_CHANNELS,
-        { withCredentials: true }
-      );
+      try {
+        const response = await apiCLient.get(
+          GET_USER_CHANNELS,
+          { withCredentials: true }
+        );
 
-      if (response.data.channels) {
-        setChannels(response.data.channels);
+        if (response.data.channels) {
+          setChannels(response.data.channels);
+        }
+      } catch (err) {
+        console.error("Failed to load channels:", err);
+        toast.error("Failed to load channels");
       }
-    }
-
+    };
 
     getContacts();
     getUserChannels();

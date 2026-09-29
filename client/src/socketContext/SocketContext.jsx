@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useCallback } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import { useAppStore } from "../store/index.js";
 import { HOST } from "../utils/constants.js";
@@ -14,6 +14,7 @@ export const useSocket = () => {
 // Provider component to wrap the application
 export const SocketProvider = ({ children }) => {
     const socket = useRef(null);
+    const [socketInstance, setSocketInstance] = useState(null);
     const { userInfo } = useAppStore();
 
     // Memoized handler for receiving direct messages
@@ -45,38 +46,43 @@ export const SocketProvider = ({ children }) => {
     useEffect(() => {
         // Don't connect if there's no logged-in user
         if (!userInfo) {
+            setSocketInstance(null);
             return;
         }
 
         // Establish the socket connection
-        socket.current = io(HOST, {
+        const newSocket = io(HOST, {
             withCredentials: true,
             query: { userId: userInfo.id },
         });
 
+        socket.current = newSocket;
+        setSocketInstance(newSocket);
+
         // Attach event listeners
-        socket.current.on("connect", () => {
-            console.log(`Socket connected: ${socket.current.id}`);
+        newSocket.on("connect", () => {
+            console.log(`Socket connected: ${newSocket.id}`);
         });
-        socket.current.on("recieveMessage", handleReceiveMessage);
-        socket.current.on("recieve-channel-message", handleReceiveChannelMessage);
+        newSocket.on("recieveMessage", handleReceiveMessage);
+        newSocket.on("recieve-channel-message", handleReceiveChannelMessage);
 
         // This is the cleanup function that runs when the component unmounts
         // or when `userInfo` changes.
         return () => {
-            if (socket.current) {
+            if (newSocket) {
                 // IMPORTANT: Remove event listeners to prevent memory leaks
-                socket.current.off("connect");
-                socket.current.off("recieveMessage", handleReceiveMessage);
-                socket.current.off("recieve-channel-message", handleReceiveChannelMessage);
-                socket.current.disconnect();
+                newSocket.off("connect");
+                newSocket.off("recieveMessage", handleReceiveMessage);
+                newSocket.off("recieve-channel-message", handleReceiveChannelMessage);
+                newSocket.disconnect();
                 socket.current = null;
+                setSocketInstance(null);
             }
         };
     }, [userInfo, handleReceiveMessage, handleReceiveChannelMessage]);
 
     return (
-        <SocketContext.Provider value={socket.current}>
+        <SocketContext.Provider value={socketInstance}>
             {children}
         </SocketContext.Provider>
     );

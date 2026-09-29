@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '../../../../../../store'
-import moment from "moment"
+import { format } from "date-fns"
 import apiCLient from '../../../../../../lib/api-client'
 import { GET_ALL_MESSAGES_ROUTE, GET_CHANNEL_MESSAGES, HOST } from '../../../../../../utils/constants'
 import { MdFolderZip, MdImage, MdPictureAsPdf, MdDescription } from "react-icons/md"
@@ -280,7 +280,7 @@ const MessageContainer = () => {
           )}
 
           <div className={`text-xs text-gray-500 mt-1 ${isOwnMessage ? "text-right" : "text-left"}`}>
-            {moment(message.timestamp).format("LT")}
+            {format(new Date(message.timestamp), "h:mm a")}
           </div>
         </div>
       </div>
@@ -375,7 +375,7 @@ const MessageContainer = () => {
           )}
 
           <div className={`text-xs text-gray-500 mt-1 ${isOwnMessage ? "text-right" : "text-left"}`}>
-            {moment(message.timestamp).format("LT")}
+            {format(new Date(message.timestamp), "h:mm a")}
           </div>
         </div>
       </div>
@@ -388,7 +388,7 @@ const MessageContainer = () => {
 
     let lastDate = null
     return selectedChatMessages.map((message, index) => {
-      const messageDate = moment(message.timestamp).format("YYYY-MM-DD")
+      const messageDate = format(new Date(message.timestamp), "yyyy-MM-dd")
       const showDate = messageDate !== lastDate
       lastDate = messageDate
 
@@ -397,7 +397,7 @@ const MessageContainer = () => {
           {showDate && (
             <div className="flex justify-center my-6">
               <div className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm px-3 py-1 rounded-full">
-                {moment(message.timestamp).format("MMMM D, YYYY")}
+                {format(new Date(message.timestamp), "MMMM d, yyyy")}
               </div>
             </div>
           )}
