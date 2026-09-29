@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
     Tooltip,
     TooltipContent,
@@ -14,14 +14,15 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { FaPlus, FaSearch } from "react-icons/fa"
-import Lottie from 'react-lottie'
-import apiCLient from '../../../../../../lib/api-client'
+import { Lottie } from 'lottie-react'
+import debounce from 'lodash.debounce'
+import apiClient from '../../../../../../lib/api-client'
 import { SEARCH_CONTACTS_ROUTE } from '../../../../../../utils/constants'
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { HOST } from '../../../../../../utils/constants'
 import { useAppStore } from '../../../../../../store'
 import { getColor } from '../../../../../../lib/utils'
-import { animationDefaultOptionsChatLoading } from '../../../../../../App'
+import { chatLoadingAnimationData } from '../../../../../../App'
 
 const NewDM = () => {
 
@@ -40,14 +41,7 @@ const NewDM = () => {
         setSelectedChatData,
     } = useAppStore()
 
-    // Debounced search function to avoid excessive API calls
-    const debounce = (func, delay) => {
-        let timeoutId
-        return (...args) => {
-            clearTimeout(timeoutId)
-            timeoutId = setTimeout(() => func(...args), delay)
-        }
-    }
+
 
 
     // Function to search contacts based on the input term
@@ -73,7 +67,7 @@ const NewDM = () => {
             setIsLoading(true)
 
             // Make API call to search contacts
-            const response = await apiCLient.post(
+            const response = await apiClient.post(
                 SEARCH_CONTACTS_ROUTE,
                 { searchTerm: trimmedTerm },
                 { withCredentials: true }
@@ -95,8 +89,17 @@ const NewDM = () => {
             setIsLoading(false);
         }
     }, [])
-    // limit the frequency of search calls using debounce
-    const debouncedSearch = useCallback(debounce(searchContacts, 300), [searchContacts])
+    // limit the frequency of search calls using debounce with cleanup
+    const debouncedSearch = useMemo(
+        () => debounce((term) => searchContacts(term), 300),
+        [searchContacts]
+    );
+
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
 
 
     // Handle search input change
@@ -174,12 +177,12 @@ const NewDM = () => {
         if (isLoading) {
             return (
                 <div className="flex-1 flex flex-col justify-center items-center p-8">
-                    <Lottie
-                        isClickToPauseDisabled={true}
-                        height={150}
-                        width={150}
-                        options={animationDefaultOptionsChatLoading}
-                    />
+                    <div style={{ width: 150, height: 150 }}>
+                        <Lottie
+                            animationData={chatLoadingAnimationData}
+                            loop={true}
+                        />
+                    </div>
                     <div className="text-opacity-80 dark:text-white flex flex-col items-center text-lg transition-all duration-300 text-center mt-4">
                         <h4 className="font-medium">
                             Searching<span className="text-purple-500">...</span>

@@ -4,13 +4,14 @@ import AuthIndex from "./pages/auth";
 import ChatIndex from "./pages/chat";
 import ProfileIndex from "./pages/profile";
 import { useAppStore } from "./store";
-import apiCLient from "./lib/api-client";
+import apiClient from "./lib/api-client";
 import { GET_USER_INFO } from "./utils/constants";
 import { ThemeProvider } from "./components/ui/theme-provider"
-import Lottie from 'react-lottie';
+import { Lottie } from 'lottie-react';
 import animationData from "../src/assets/customer-service-chat.json";
 
-// Default options for the loading animation
+// Animation data and backward compatibility options
+export const chatLoadingAnimationData = animationData;
 export const animationDefaultOptionsChatLoading = {
   loop: true,
   autoplay: true,
@@ -43,7 +44,7 @@ const App = () => {
     // Function to fetch user data from the API
     const getUserData = async () => {
       try {
-        const response = await apiCLient.get(GET_USER_INFO, {
+        const response = await apiClient.get(GET_USER_INFO, {
           withCredentials: true, // Include credentials for cross-origin requests
         });
 
@@ -73,12 +74,12 @@ const App = () => {
   // If loading is true, show a loading animation
   if (loading) {
     return <div className=" w-[100vw] h-[100vh] flex flex-col justify-center items-center pb-20" >
-      <Lottie
-        isClickToPauseDisabled={true}
-        height={400}
-        width={400}
-        options={animationDefaultOptionsChatLoading}
-      />
+      <div style={{ width: 400, height: 400 }}>
+        <Lottie
+          animationData={animationData}
+          loop={true}
+        />
+      </div>
       <span className="text-xl font-semibold">Hang tight! We're waking up the server for you...</span>
     </div>;
   }

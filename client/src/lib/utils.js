@@ -27,8 +27,9 @@ export const getColor = (color) => {
 };
 
 
+export const chatAnimationData = animationData;
 export const animationDefaultOptions = {
-  loop:true,
-  autoplay:true,
+  loop: true,
+  autoplay: true,
   animationData
-}
+};

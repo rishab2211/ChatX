@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Camera, Trash2, Save, User, Mail, Palette, Loader2 } from 'lucide-react';
 import { ADD_PROFILE_IMAGE_ROUTE, HOST, REMOVE_PROFILE_IMAGE_ROUTE, UPDATE_PROFILE_ROUTE } from "../../utils/constants";
 import { ModeToggle } from "../../components/ui/mode-toggle";
-import apiCLient from "../../lib/api-client";
+import apiClient from "../../lib/api-client";
 import { colors, getColor } from "../../lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -48,7 +48,7 @@ const ProfileIndex = () => {
 
     try {
 
-      const response = await apiCLient.post(
+      const response = await apiClient.post(
         UPDATE_PROFILE_ROUTE,
         {
           userId: userInfo.id,
@@ -116,7 +116,7 @@ const ProfileIndex = () => {
       const formData = new FormData();
       formData.append("profile-image", file);
 
-      const response = await apiCLient.post(
+      const response = await apiClient.post(
         ADD_PROFILE_IMAGE_ROUTE,
         formData,
         {
@@ -148,7 +148,7 @@ const ProfileIndex = () => {
     setIsImageUploading(true);
 
     try {
-      const response = await apiCLient.delete(
+      const response = await apiClient.delete(
         REMOVE_PROFILE_IMAGE_ROUTE,
         { withCredentials: true }
       );

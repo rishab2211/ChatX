@@ -99,15 +99,9 @@ const server = app.listen(port, () => {
 // app.use(setupSocket);
 setupSocket(server);
 
-// creating unique index at email field to ensure no two user have same email
+// Database connection
 mongoose
   .connect(DbUrl)
-  .then(async () => {
-    await mongoose.connection.db
-      .collection("users")
-      .createIndex({ email: 1 }, { unique: true });
-    console.log("Unique index created on email field");
-  })
   .then(() => {
     console.log("DB connection successful!");
   })

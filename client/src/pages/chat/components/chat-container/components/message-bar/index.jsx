@@ -7,7 +7,7 @@ import EmojiPicker from "emoji-picker-react"
 import { useAppStore } from '../../../../../../store'
 import { useSocket } from '../../../../../../socketContext/SocketContext'
 import { UPLOAD_FILES_ROUTE } from '../../../../../../utils/constants'
-import apiCLient from '../../../../../../lib/api-client'
+import apiClient from '../../../../../../lib/api-client'
 
 const MessageBar = () => {
     const [message, setMessage] = useState("")
@@ -249,7 +249,7 @@ const MessageBar = () => {
             formData.append("file", file)
 
             // Send file to server
-            const response = await apiCLient.post(UPLOAD_FILES_ROUTE, formData, {
+            const response = await apiClient.post(UPLOAD_FILES_ROUTE, formData, {
                 withCredentials: true,
                 onUploadProgress: (progressEvent) => {
                     const progress = Math.round(

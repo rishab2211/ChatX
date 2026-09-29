@@ -4,7 +4,7 @@ import ProfileInfo from './components/profileInfo'
 import NewDM from './components/new-dm'
 import { ModeToggle } from '../../../../components/ui/mode-toggle'
 import { useAppStore } from '../../../../store'
-import apiCLient from '../../../../lib/api-client'
+import apiClient from '../../../../lib/api-client'
 import { GET_CONTACTS_ROUTES, GET_USER_CHANNELS } from '../../../../utils/constants'
 import { toast } from 'sonner'
 import ContactList from '../../../../components/ui/contact-list'
@@ -22,7 +22,7 @@ const ContactsContainer = () => {
     // Fetch contacts and channels when component mounts
     const getContacts = async () => {
       try {
-        const response = await apiCLient.get(
+        const response = await apiClient.get(
           GET_CONTACTS_ROUTES,
           { withCredentials: true }
         );
@@ -39,7 +39,7 @@ const ContactsContainer = () => {
     // Fetch user channels
     const getUserChannels = async () => {
       try {
-        const response = await apiCLient.get(
+        const response = await apiClient.get(
           GET_USER_CHANNELS,
           { withCredentials: true }
         );

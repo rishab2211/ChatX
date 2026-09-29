@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '../../../../../../store'
 import { format } from "date-fns"
-import apiCLient from '../../../../../../lib/api-client'
+import apiClient from '../../../../../../lib/api-client'
 import { GET_ALL_MESSAGES_ROUTE, GET_CHANNEL_MESSAGES, HOST } from '../../../../../../utils/constants'
 import { MdFolderZip, MdImage, MdPictureAsPdf, MdDescription } from "react-icons/md"
 import { IoMdDownload, IoMdClose } from "react-icons/io"
@@ -79,7 +79,7 @@ const MessageContainer = () => {
 
     try {
       // Fetch the file from the server
-      const response = await apiCLient.get(`${HOST}/${fileURL}`, {
+      const response = await apiClient.get(`${HOST}/${fileURL}`, {
         responseType: "blob",
         timeout: 30000 // 30 second timeout
       })
@@ -157,7 +157,7 @@ const MessageContainer = () => {
 
       // Fetch messages based on selected chat type
       if (selectedChatType === "contact") {
-        response = await apiCLient.post(
+        response = await apiClient.post(
           GET_ALL_MESSAGES_ROUTE,
           { id: selectedChatData._id },
           { withCredentials: true }
@@ -170,7 +170,7 @@ const MessageContainer = () => {
       } else if (selectedChatType === "channel") {
 
         // Fetch channel messages
-        response = await apiCLient.get(
+        response = await apiClient.get(
           `${GET_CHANNEL_MESSAGES}/${selectedChatData._id}`,
           { withCredentials: true }
         )
