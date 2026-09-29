@@ -19,7 +19,7 @@ export const searchContacts = async (req, res) => {
 
     // Sanitize the search term to prevent regex injection
     // This replaces any special regex characters with their escaped versions
-    const sanitizedSearchTerm = searchTerm.replace(/[.*+?^{}()|[|]\\]/g, "\\$&");
+    const sanitizedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Create a case-insensitive regex from the sanitized search term
     // This allows for flexible searching without case sensitivity

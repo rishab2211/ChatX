@@ -42,6 +42,7 @@ export const signup = async (req, res) => {
       maxAge,
       secure: true,
       sameSite: "None",
+      httpOnly: true,
     });
 
     // status code 201(new resource created successfully)
@@ -92,6 +93,7 @@ export const login = async (req, res) => {
       maxAge,
       secure: true,
       sameSite: "None",
+      httpOnly: true,
     });
 
 
@@ -141,7 +143,8 @@ export const getUserInfo = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     // destruct info from request
-    const { userId, firstName, lastName, color } = req.body;
+    const { firstName, lastName, color } = req.body;
+    const userId = req.userId;
 
     // validation - exist
     if (!firstName || !lastName) {
@@ -270,7 +273,7 @@ export const removeProfileImage = async (req, res, next) => {
 export const logOut = async (req, res, next) => {
   try {
     // Clear the JWT cookie
-    res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None" });
+    res.cookie("jwt", "", { maxAge: 1, secure: true, sameSite: "None", httpOnly: true });
 
     // Send a success response
     return res.status(200).send("Logout successful");

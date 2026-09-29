@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from "socket.io";
+import jwt from "jsonwebtoken";
 import Messages from "./models/MessagesModel.js";
-import Channel from "./models/ChannelModel.js"
+import Channel from "./models/ChannelModel.js";
 
 // Function to setup socket.io server
 // It initializes the socket.io server with CORS settings and handles user connections
@@ -11,6 +12,29 @@ const setupSocket = (server) => {
       methods: ["GET", "POST"],
       credentials: true,
     },
+  });
+
+  // Authenticate socket connections using JWT from HTTP cookie
+  io.use((socket, next) => {
+    const cookies = socket.handshake.headers.cookie || "";
+    const jwtCookie = cookies
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("jwt="));
+
+    const token = jwtCookie ? jwtCookie.split("=")[1] : null;
+
+    if (!token) {
+      return next(new Error("Authentication error: No token provided"));
+    }
+
+    jwt.verify(token, process.env.JWT_KEY, (err, decoded) => {
+      if (err || !decoded?.userId) {
+        return next(new Error("Authentication error: Invalid or expired token"));
+      }
+      socket.userId = decoded.userId;
+      next();
+    });
   });
 
   // Map to keep track of user socket connections
@@ -133,24 +157,21 @@ const setupSocket = (server) => {
     }
   }
 
-  // Listen for incoming socket connections
-  // When a user connects, their user ID is stored in the userSocketMap
+  // Listen for incoming authenticated socket connections
   io.on("connection", (socket) => {
-
-    // handshake.query contains the user ID sent from the client
-    // This allows the server to identify which user is connecting
-    const userId = socket.handshake.query.userId;
+    // Verified user ID from JWT middleware
+    const userId = socket.userId;
     if (userId) {
       userSocketMap.set(userId, socket.id);
-    } else {
-      console.log("User ID not provided during connection,");
     }
 
-    // send message and channel message handlers
+    // Send message and channel message handlers (enforce verified sender)
     socket.on("sendMessage", (message) => {
-      sendMessage(message);
+      sendMessage({ ...message, sender: socket.userId });
     });
-    socket.on("send-channel-message", sendChannelMessage);
+    socket.on("send-channel-message", (message) => {
+      sendChannelMessage({ ...message, sender: socket.userId });
+    });
 
     // Handle user disconnection
     socket.on("disconnect", () => disconnect(socket));

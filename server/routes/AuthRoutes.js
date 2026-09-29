@@ -7,9 +7,22 @@ import multer from "multer";
 
 
 
+const imageFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+  if (allowed.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only image files (JPEG, PNG, WebP, GIF, SVG) are allowed."), false);
+  }
+};
+
 // instance of Express router
 const authRoutes = Router();
-const upload = multer({ dest: "uploads/profiles/" })
+const upload = multer({
+  dest: "uploads/profiles/",
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: imageFilter
+});
 // on /signup endpoint the signup logic will be used
 authRoutes.post("/signup", signup);
 // on /login endpoint the signup login will be used

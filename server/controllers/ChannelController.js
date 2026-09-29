@@ -114,6 +114,13 @@ export const getChannelMessages = async (req, res, next) => {
             return res.status(404).send("Channel not found");
         }
 
+        // Authorization check: verify requesting user is a member or admin
+        const isMember = channel.members?.some((m) => m.toString() === req.userId);
+        const isAdmin = channel.admin?.toString() === req.userId;
+        if (!isMember && !isAdmin) {
+            return res.status(403).send("Access denied. You are not a member of this channel.");
+        }
+
         // Return the messages of the channel
         return res.status(200).json({
             messages: channel.messages
