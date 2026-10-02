@@ -2,45 +2,47 @@
 
 ## 1. Entity Relationship Diagram (ERD)
 
-The following Mermaid ER diagram illustrates the logical and physical document schema for ChatX across MongoDB collections, including primary keys, foreign key references, and exact cardinalities.
+The following ER diagram reflects the actual Mongoose model definitions across the three MongoDB collections in ChatX.
+
+> **Cardinality note**: A `Messages` document is linked to a `Channels` document indirectly — the `Channel.messages` array holds `ObjectId` references to `Messages` documents. A `Messages` document does not carry a `channelId` back-reference (parent-reference pattern is not implemented yet). The ERD reflects the actual current schema, not the desired future state.
 
 ```mermaid
 erDiagram
-    Users ||--o{ Messages : "sends (sender)"
-    Users ||--o{ Messages : "receives (recipient)"
-    Users ||--o{ Channels : "administers (admin)"
-    Users }o--o{ Channels : "participates_in (members)"
-    Channels ||--o{ Messages : "contains (messages)"
+    Users ||--o{ Messages : "sends as sender"
+    Users |o--o{ Messages : "receives as recipient"
+    Users ||--o{ Channels : "administers"
+    Users }o--o{ Channels : "member of"
+    Channels }o--o{ Messages : "references in messages array"
 
     Users {
-        ObjectId _id PK "Auto-generated unique document identifier"
-        String email UK "Unique user email address"
-        String password "Salted bcrypt password hash"
-        String firstName "Optional user given name"
-        String lastName "Optional user family name"
-        String image "Filesystem path or URL to profile avatar"
-        Number color "Selected avatar palette color index (0-4)"
-        Boolean profileSetup "Profile onboarding completion status"
+        ObjectId _id PK "Auto-generated document identifier"
+        String email "Required, unique index"
+        String password "Required, bcrypt hash via pre-save hook"
+        String firstName "Optional"
+        String lastName "Optional"
+        String image "Optional, local disk path or URL"
+        Number color "Optional, client avatar color index"
+        Boolean profileSetup "Default false"
     }
 
     Messages {
-        ObjectId _id PK "Auto-generated unique message identifier"
-        ObjectId sender FK "Reference to Users._id (Originator)"
-        ObjectId recipient FK "Reference to Users._id (Direct recipient, null in channels)"
-        String messageType "Enum discriminator: 'text' or 'file'"
-        String content "Plaintext message payload (required for text)"
-        String fileUrl "Disk path or URL of uploaded file (required for file)"
-        Date timestamp "Creation timestamp (Default: Date.now)"
+        ObjectId _id PK "Auto-generated document identifier"
+        ObjectId sender FK "Required, ref Users"
+        ObjectId recipient FK "Optional, ref Users, null for channel messages"
+        String messageType "Required, enum text or file"
+        String content "Required only when messageType is text"
+        String fileUrl "Required only when messageType is file"
+        Date timestamp "Default Date.now"
     }
 
     Channels {
-        ObjectId _id PK "Auto-generated unique channel identifier"
-        String nameOfChannel "Human-readable channel title"
-        ObjectId admin FK "Reference to Users._id (Channel creator)"
-        Array members "Array of ObjectIds referencing Users._id"
-        Array messages "Array of ObjectIds referencing Messages._id"
-        Date createdAt "Channel creation timestamp"
-        Date updatedAt "Timestamp of last channel update/message"
+        ObjectId _id PK "Auto-generated document identifier"
+        String nameOfChannel "Required"
+        ObjectId admin FK "Required, ref Users"
+        ObjectId members FK "Array of ObjectIds, ref Users"
+        ObjectId messages FK "Array of ObjectIds, ref Messages"
+        Date createdAt "Default Date.now"
+        Date updatedAt "Default Date.now, updated by Mongoose hooks"
     }
 ```
 
@@ -48,166 +50,125 @@ erDiagram
 
 ## 2. Comprehensive Data Dictionary
 
-### Collection: `Users`
-**Physical Collection Name**: `users`  
-**Model Definition**: [UserModel.js](file:///home/rishab/Personal/WebDev/ChatX/server/models/UserModel.js)  
-**Description**: Stores core user authentication credentials, identity information, profile visual personalization, and onboarding flags.
+### Collection: `users`
+**Mongoose Registration**: `mongoose.model("Users", userSchema)` → collection `users` (Mongoose lowercases and pluralizes)
+**Model Definition**: [UserModel.js](../server/models/UserModel.js)
 
-| Field Name | BSON / JS Type | Nullable | Default | Constraints & Validations | Description & Cascade Rules |
+| Field Name | BSON Type | Nullable | Default | Constraints & Validations | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `_id` | `ObjectId` | No | Auto | Primary Key (MongoDB native) | Immutable document identifier. |
-| `email` | `String` | No | None | `required: [true, "Email is required"]`, `unique: true` | Primary credential. Enforced via unique B-Tree index. |
-| `password` | `String` | No | None | `required: [true, "Password is required"]`, min-length 8 enforced in controller | Salted BCrypt hash (generated via Mongoose `pre("save")` hook). Plaintext is never stored. |
-| `firstName` | `String` | Yes | `null` | Optional | User's first name. Filtered in directory and contact searches. |
-| `lastName` | `String` | Yes | `null` | Optional | User's family name. Filtered in directory and contact searches. |
-| `image` | `String` | Yes | `null` | Optional | Relative local disk path (e.g. `uploads/profiles/1727931200000.png`) or cloud URL. |
-| `color` | `Number` | Yes | `null` | Optional | Integer index mapped to Tailwind color themes on client UI. |
-| `profileSetup`| `Boolean` | No | `false` | None | Boolean gate used by client routing guards to redirect users to `/profile` on first login. |
+| `_id` | `ObjectId` | No | Auto | Primary Key | Immutable. |
+| `email` | `String` | No | — | `required: [true, "Email is required"]`, `unique: true` | Unique B-Tree index auto-created by Mongoose. Used as the `$lookup` join key from `messages` collection in `getContactsForDMList`. |
+| `password` | `String` | No | — | `required: [true, "Password is required"]` | Bcrypt hash. Generated in `pre("save")` hook via `genSalt()` (10 rounds) + `hash()`. Minimum 8-char plaintext enforced in [`AuthController.js L28–30`](../server/controllers/AuthController.js#L28-L30). |
+| `firstName` | `String` | Yes | `undefined` | `required: false` | Not set on signup. Set by `POST /api/auth/update-profile`. Used in regex search. |
+| `lastName` | `String` | Yes | `undefined` | `required: false` | Not set on signup. Set by `POST /api/auth/update-profile`. |
+| `image` | `String` | Yes | `undefined` | `required: false` | Relative disk path (e.g. `uploads/profiles/1727931200000.png`). Returned as-is by API — client prefixes `VITE_SERVER_URL` to construct the full URL. |
+| `color` | `Number` | Yes | `undefined` | `required: false` | Integer. Client maps index to a Tailwind avatar background color. No range validation in schema. |
+| `profileSetup` | `Boolean` | No | `false` | — | Set to `true` when `POST /api/auth/update-profile` succeeds. Client `App.jsx` and route guards use this to redirect incomplete profiles to `/profile`. |
 
-**Cascade & Integrity Rules**:
-- When a `User` is deleted:
-  - Direct messages sent/received by the user are retained in the `Messages` collection for audit integrity; sender/recipient fields will resolve to `null` on populate.
-  - Channels administered by the user require an administrative transfer or deletion cascade handled in the controller layer.
-  - The user's avatar file on disk must be unlinked via `fs.unlink`.
+**On-Delete Behavior**: No cascade. Mongoose has no equivalent to SQL `ON DELETE CASCADE`. Deleting a user document leaves orphaned `Messages` with `sender`/`recipient` pointing to a non-existent `_id`. These resolve to `null` during `.populate()`. Application-layer cleanup must be implemented manually.
 
 ---
 
-### Collection: `Messages`
-**Physical Collection Name**: `messages`  
-**Model Definition**: [MessagesModel.js](file:///home/rishab/Personal/WebDev/ChatX/server/models/MessagesModel.js)  
-**Description**: Append-only log of one-to-one direct messages and channel messages.
+### Collection: `messages`
+**Mongoose Registration**: `mongoose.model("Messages", messageSchema)` → collection `messages`
+**Model Definition**: [MessagesModel.js](../server/models/MessagesModel.js)
 
-| Field Name | BSON / JS Type | Nullable | Default | Constraints & Validations | Description & Cascade Rules |
+| Field Name | BSON Type | Nullable | Default | Constraints & Validations | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `_id` | `ObjectId` | No | Auto | Primary Key | Immutable message identifier. |
-| `sender` | `ObjectId` | No | None | `ref: "Users"`, `required: true` | Foreign key referencing the originator user in `users`. |
-| `recipient` | `ObjectId` | Yes | `null` | `ref: "Users"`, `required: false` | Foreign key referencing recipient user in `users`. Set to `null` for channel messages. |
-| `messageType`| `String` | No | None | `enum: ["text", "file"]`, `required: true` | Type discriminator for conditional payload validation. |
-| `content` | `String` | Yes | `null` | Required if `messageType === "text"` | Plaintext message body. Validated via dynamic Mongoose validation function. |
-| `fileUrl` | `String` | Yes | `null` | Required if `messageType === "file"` | Path or URL to uploaded asset. Validated via dynamic Mongoose validation function. |
-| `timestamp` | `Date` | No | `Date.now`| `default: Date.now` | Millisecond-precision timestamp used for message ordering and contact recency aggregation. |
+| `_id` | `ObjectId` | No | Auto | Primary Key | Used as the reference stored in `Channel.messages` array. |
+| `sender` | `ObjectId` | No | — | `ref: "Users"`, `required: true` | Always overwritten server-side to `socket.userId` in socket handlers — client-supplied sender value is ignored. |
+| `recipient` | `ObjectId` | Yes | — | `ref: "Users"`, `required: false` | `null` for channel messages (set explicitly in `socket.js L107–114`). Present for direct messages. |
+| `messageType` | `String` | No | — | `required: true`, `enum: ["text", "file"]` | Acts as a discriminator for conditional field validation. |
+| `content` | `String` | Yes | — | `required: function() { return this.messageType === "text"; }` | Dynamic validator. Required only for `text` messages. |
+| `fileUrl` | `String` | Yes | — | `required: function() { return this.messageType === "file"; }` | Relative disk path returned by `POST /api/messages/upload-file`. Client prefixes the server URL. |
+| `timestamp` | `Date` | No | `Date.now` | `default: Date.now` | Used for ordering in `find().sort({ timestamp: 1 })` and as the sort key in the contacts aggregation pipeline. |
 
-**Cascade & Integrity Rules**:
-- Direct messages reference both `sender` and `recipient`.
-- Channel messages reference only `sender`; `recipient` is explicitly set to `null`.
-- If an attachment message is purged, the associated binary file at `fileUrl` must be cleaned from disk.
+**On-Delete Behavior**: No cascade. `Channel.messages` array retains the `ObjectId` even after the `Messages` document is deleted. Stale references must be cleaned manually.
 
 ---
 
-### Collection: `Channels`
-**Physical Collection Name**: `channels`  
-**Model Definition**: [ChannelModel.js](file:///home/rishab/Personal/WebDev/ChatX/server/models/ChannelModel.js)  
-**Description**: Represents collaborative multi-user group chat rooms.
+### Collection: `channels`
+**Mongoose Registration**: `mongoose.model("Channels", channelSchema)` → collection `channels`
+**Model Definition**: [ChannelModel.js](../server/models/ChannelModel.js)
 
-| Field Name | BSON / JS Type | Nullable | Default | Constraints & Validations | Description & Cascade Rules |
+| Field Name | BSON Type | Nullable | Default | Constraints & Validations | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `_id` | `ObjectId` | No | Auto | Primary Key | Unique channel identifier. |
-| `nameOfChannel`| `String` | No | None | `required: true` | Display name of the channel. |
-| `admin` | `ObjectId` | No | None | `ref: "Users"`, `required: true` | Creator and administrator user ID. Holds elevated channel permissions. |
-| `members` | `Array<ObjectId>` | No | `[]` | `ref: "Users"`, `required: true` | Array of user `ObjectId`s authorized to participate in this channel. |
-| `messages` | `Array<ObjectId>` | No | `[]` | `ref: "Messages"`, `required: false` | Array of message `ObjectId`s belonging to this channel. |
-| `createdAt` | `Date` | No | `Date.now`| Immutable timestamp | Timestamp of channel initialization. |
-| `updatedAt` | `Date` | No | `Date.now`| Hook updated | Managed via Mongoose `pre("save")` and `pre("findOneAndUpdate")` hooks to reflect last message activity. |
+| `_id` | `ObjectId` | No | Auto | Primary Key | Used in socket event `channelId` field to route channel messages. |
+| `nameOfChannel` | `String` | No | — | `required: true` | No uniqueness constraint — duplicate channel names are allowed. |
+| `admin` | `ObjectId` | No | — | `ref: "Users"`, `required: true` | Set to `req.userId` at channel creation in [`ChannelController.js L29`](../server/controllers/ChannelController.js#L29). The admin also receives channel messages via socket broadcast in addition to the `members` array. |
+| `members` | `Array<ObjectId>` | No | `[]` | `ref: "Users"`, `required: true` per element | Validated at creation: `User.find({ _id: { $in: members } })` must return same count as input. Does **not** include the admin. Admin is tracked separately and broadcast separately in `socket.js L152–156`. |
+| `messages` | `Array<ObjectId>` | No | `[]` | `ref: "Messages"`, `required: false` | Append-only via `$push` on every channel message. Grows unboundedly — a known scaling limitation (see docs/3-scale-and-limits.md). |
+| `createdAt` | `Date` | No | `Date.now` | — | Set at document creation. Not updated by hooks. |
+| `updatedAt` | `Date` | No | `Date.now` | Updated by `pre("save")` and `pre("findOneAndUpdate")` hooks | Used as sort key in `getUserChannels`: `Channel.find(...).sort({ updatedAt: -1 })`. |
 
-**Cascade & Integrity Rules**:
-- When a channel is deleted:
-  - All associated `Messages` referenced in `messages` should be batch-deleted via `Messages.deleteMany({ _id: { $in: channel.messages } })`.
-  - Binary files referenced in those messages should be cleaned up asynchronously.
+**Important**: The `admin` is **not** included in the `members` array. When broadcasting channel messages in [`socket.js L136–157`](../server/socket.js#L136-L157), the code iterates `channel.members` and then separately emits to `channel.admin`. Any authorization check that only checks `channel.members.includes(userId)` will incorrectly reject the admin.
 
 ---
 
 ## 3. Indexing Strategy & Performance Justifications
 
-```mermaid
-graph TD
-    subgraph Users_Indexes ["Users Collection Indexes"]
-        U_PK["_id (Primary B-Tree)"]
-        U_Email["email (Unique B-Tree)"]
-        U_Search["Compound Prefix Index: { firstName: 1, lastName: 1, email: 1 }"]
-    end
+### Currently Active Indexes (Auto-Created by Mongoose/MongoDB)
 
-    subgraph Messages_Indexes ["Messages Collection Indexes"]
-        M_PK["_id (Primary B-Tree)"]
-        M_Direct["Compound Index: { sender: 1, recipient: 1, timestamp: 1 }"]
-        M_Reverse["Compound Index: { recipient: 1, sender: 1, timestamp: 1 }"]
-        M_Agg["Compound Recency Index: { sender: 1, timestamp: -1 }"]
-    end
+| Collection | Field | Index Type | Created By | Justification |
+| :--- | :--- | :--- | :--- | :--- |
+| `users` | `_id` | Unique B-Tree | MongoDB native | All `User.findById(req.userId)` calls in auth middleware and controllers. |
+| `users` | `email` | Unique B-Tree | `unique: true` in schema | `User.findOne({ email })` in `login` and `signup`. Without this index, each login is an O(N) collection scan. |
+| `messages` | `_id` | Unique B-Tree | MongoDB native | `Messages.findById(createdMessage._id).populate(...)` after every message create. |
+| `channels` | `_id` | Unique B-Tree | MongoDB native | `Channel.findById(channelId)` in `getChannelMessages` and socket handlers. |
 
-    subgraph Channels_Indexes ["Channels Collection Indexes"]
-        C_PK["_id (Primary B-Tree)"]
-        C_Members["Multikey Index: { members: 1 }"]
-        C_Admin["Single Index: { admin: 1 }"]
-        C_Updated["Sort Index: { updatedAt: -1 }"]
-    end
+### Recommended Secondary Indexes (Not Yet Implemented)
+
+#### A. Direct Message History Retrieval
+```javascript
+// MessagesModel.js
+messageSchema.index({ sender: 1, recipient: 1, timestamp: 1 });
+messageSchema.index({ recipient: 1, sender: 1, timestamp: 1 });
 ```
+**Query served** ([MessagesController.js L16–21](../server/controllers/MessagesController.js#L16-L21)):
+```javascript
+Messages.find({
+  $or: [
+    { sender: user1, recipient: user2 },
+    { sender: user2, recipient: user1 },
+  ],
+}).sort({ timestamp: 1 });
+```
+**Justification**: The `$or` with two compound predicates requires two index intersection operations. Without an index, MongoDB performs a full collection scan across all messages for all users. With separate compound indexes on `(sender, recipient, timestamp)` and `(recipient, sender, timestamp)`, each branch of the `$or` can use an index range scan, and the sort on `timestamp` is covered by the index — no in-memory sort buffer required.
 
-### 1. Existing Production Indexes
-- **`Users._id`** (Unique B-Tree, Auto): Serves as the primary key. Guarantees $O(1)$ point lookups by `userId` during JWT validation and user info queries.
-- **`Users.email`** (Unique B-Tree): Automatically created via `unique: true` in [UserModel.js](file:///home/rishab/Personal/WebDev/ChatX/server/models/UserModel.js#L9). Prevents duplicate registrations and accelerates `User.findOne({ email })` lookups to $<2\text{ms}$.
-- **`Messages._id`** (Unique B-Tree, Auto): Accelerates individual message lookups following creation.
-- **`Channels._id`** (Unique B-Tree, Auto): Accelerates channel point lookups during message delivery and permission verification.
+#### B. DM Contact Recency Aggregation
+```javascript
+messageSchema.index({ sender: 1, timestamp: -1 });
+messageSchema.index({ recipient: 1, timestamp: -1 });
+```
+**Query served** ([ContactsController.js L67–78](../server/controllers/ContactsController.js#L67-L78)):
+```javascript
+Messages.aggregate([
+  { $match: { $or: [{ sender: userId }, { recipient: userId }] } },
+  { $sort: { timestamp: -1 } },
+  ...
+]);
+```
+**Justification**: The `$sort` stage on `timestamp` is the first costly operation after `$match`. With an index on `{ sender: 1, timestamp: -1 }`, MongoDB can produce pre-sorted results for the sender branch without an in-memory sort. Without this, the aggregation pipeline performs a `SORT` on the full matched result set in working memory (capped at 100MB before spilling to disk).
 
-### 2. High-Impact Secondary & Compound Indexes (Recommended for Scaling)
+#### C. Channel Membership Lookups
+```javascript
+// ChannelModel.js
+channelSchema.index({ members: 1 });
+channelSchema.index({ admin: 1 });
+// Compound for sorted listing:
+channelSchema.index({ admin: 1, updatedAt: -1 });
+channelSchema.index({ members: 1, updatedAt: -1 });
+```
+**Query served** ([ChannelController.js L58–60](../server/controllers/ChannelController.js#L58-L60)):
+```javascript
+Channel.find({
+  $or: [{ admin: userId }, { members: userId }]
+}).sort({ updatedAt: -1 });
+```
+**Justification**: `members` is an array — an index on it creates a MongoDB **multikey index**, one index entry per array element. This allows `members: userId` to be resolved as a point lookup rather than a scan. Without this, every sidebar channel list load scans the entire `channels` collection.
 
-#### A. Direct Message Retrieval Optimization
-- **Index Specification**:
-  ```javascript
-  // Direct Message query index
-  messageSchema.index({ sender: 1, recipient: 1, timestamp: 1 });
-  messageSchema.index({ recipient: 1, sender: 1, timestamp: 1 });
-  ```
-- **Query Benefited**: [MessagesController.js#L16-L21](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/MessagesController.js#L16-L21):
-  ```javascript
-  Messages.find({
-    $or: [
-      { sender: user1, recipient: user2 },
-      { sender: user2, recipient: user1 },
-    ],
-  }).sort({ timestamp: 1 });
-  ```
-- **Justification**: Without this compound index, the `$or` query forces MongoDB to perform a full collection scan across all historical messages in the system. The compound index provides index-covered sorting on `timestamp`, eliminating memory sort buffers (`Sort operation used more than 33554432 bytes of RAM`).
-
-#### B. Direct Message Contact List Recency Aggregation
-- **Index Specification**:
-  ```javascript
-  messageSchema.index({ sender: 1, timestamp: -1 });
-  messageSchema.index({ recipient: 1, timestamp: -1 });
-  ```
-- **Query Benefited**: [ContactsController.js#L67-L78](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L67-L78):
-  ```javascript
-  Messages.aggregate([
-    { $match: { $or: [{ sender: userId }, { recipient: userId }] } },
-    { $sort: { timestamp: -1 } },
-    ...
-  ]);
-  ```
-- **Justification**: The pipeline matches messages where the user is either sender or recipient and immediately executes a descending sort on `timestamp`. This index allows the MongoDB query planner to execute an index scan without pulling millions of unrelated records into working memory.
-
-#### C. User Channel Membership Lookups
-- **Index Specification**:
-  ```javascript
-  channelSchema.index({ members: 1 });
-  channelSchema.index({ admin: 1 });
-  channelSchema.index({ updatedAt: -1 });
-  ```
-- **Query Benefited**: [ChannelController.js#L58-L60](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ChannelController.js#L58-L60):
-  ```javascript
-  Channel.find({
-    $or: [{ admin: userId }, { members: userId }]
-  }).sort({ updatedAt: -1 });
-  ```
-- **Justification**: `members` is an array of `ObjectId`s. Creating an index on `members` produces a **multikey index**, allowing MongoDB to locate all channels a user belongs to in logarithmic time. Coupling this with `{ updatedAt: -1 }` guarantees zero-cost sorting when ordering the sidebar channel list.
-
-#### D. Contact Search Directory Indexing
-- **Index Specification**:
-  ```javascript
-  userSchema.index({ firstName: "text", lastName: "text", email: "text" });
-  ```
-- **Query Benefited**: [ContactsController.js#L31-L34](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L31-L34):
-  ```javascript
-  User.find({
-    $and: [{ _id: { $ne: req.userId } }],
-    $or: [{ firstName: regex }, { lastName: regex }, { email: regex }],
-  });
-  ```
-- **Justification**: The current implementation uses case-insensitive regular expressions (`new RegExp(sanitizedSearchTerm, "i")`). Case-insensitive regex searches cannot utilize standard B-Tree indexes unless prefix-anchored (`^`). A text index allows full-text token search with scoring, reducing query execution times on large user bases from seconds to milliseconds.
+#### D. Contact Search Full-Text Index (Future)
+```javascript
+userSchema.index({ firstName: "text", lastName: "text", email: "text" });
+```
+**Justification**: The current search uses `new RegExp(sanitizedSearchTerm, "i")` — case-insensitive regex. MongoDB cannot use a standard B-Tree index for unanchored or case-insensitive regex matches. A text index tokenizes field values and supports fast prefix and full-word lookups. Note: a collection can have only **one text index** — all three fields must be combined into a single `text` index specification.

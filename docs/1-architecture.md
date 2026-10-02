@@ -2,13 +2,13 @@
 
 ## 1. System Architecture Overview
 
-ChatX is a high-availability, full-duplex real-time communication platform built on a decoupled client-server architecture. The system decouples high-frequency bidirectional event transport (WebSockets via Socket.IO) from transactional RESTful business logic (Express.js), backed by MongoDB Atlas for document persistence and local or object storage for multimedia assets.
+ChatX is a high-availability, full-duplex real-time communication platform built on a decoupled client-server architecture. The system decouples high-frequency bidirectional event transport (WebSockets via Socket.IO) from transactional RESTful business logic (Express.js), backed by MongoDB Atlas for document persistence and local filesystem storage for multimedia assets.
 
 The runtime consists of:
 - **Client Tier**: Single Page Application (SPA) built with React 18, Vite, Tailwind CSS, Shadcn UI primitives, and Zustand for state orchestration.
-- **Edge / Delivery Tier**: Vercel Global Edge Network handling SSL/TLS termination, HTTP/2 static bundle caching, and SPA client-side route rewrites.
-- **Application Server Tier**: Node.js v18+ runtime executing an Express.js HTTP application server co-hosted with a Socket.IO WebSocket server.
-- **Data & Storage Tier**: MongoDB Atlas multi-node replica set with Mongoose ODM, alongside a hierarchical filesystem storage layer for binary message attachments and user avatars.
+- **Edge / Delivery Tier**: Vercel Global Edge Network handling TLS termination, HTTP/2 static bundle caching, and SPA client-side route rewrites (`vercel.json`).
+- **Application Server Tier**: Node.js v18+ runtime executing an Express.js HTTP application server co-hosted with a Socket.IO WebSocket server on the **same TCP port**.
+- **Data & Storage Tier**: MongoDB Atlas (or local `mongod`) with Mongoose ODM, alongside a local filesystem storage layer (`uploads/profiles`, `uploads/files`) for binary message attachments and user avatars.
 
 ---
 
@@ -18,77 +18,83 @@ The following C4 container diagram illustrates the architectural boundaries, exe
 
 ```mermaid
 graph TD
-    subgraph Users ["User Agents"]
-        Browser["Modern Web Browser<br/>(Desktop / Mobile)"]
+    Browser["Modern Web Browser (Desktop / Mobile)"]
+
+    subgraph Edge ["Edge and Ingress Tier"]
+        VercelCDN["Vercel Global Edge Network\nTLS Termination, Static Asset CDN"]
+        ReverseProxy["Ingress Reverse Proxy\nTLS Termination, WS Upgrades"]
     end
 
-    subgraph Edge ["Edge & Ingress Tier"]
-        VercelCDN["Vercel Global Edge Network<br/>(TLS Termination, Static Asset CDN)"]
-        ReverseProxy["Ingress Reverse Proxy / Load Balancer<br/>(TLS Termination, Sticky Sessions, WS Upgrades)"]
+    subgraph ClientApp ["Frontend Container"]
+        ReactApp["React 18 SPA\nVite, React Router v6, Tailwind CSS"]
+        ZustandStore["Zustand Global Store\nAuthSlice, ChatSlice"]
+        SocketClient["Socket.IO Client\nWebSocket + Polling Transport"]
+        AxiosClient["Axios HTTP Client\nwithCredentials: true"]
     end
 
-    subgraph ClientApp ["Frontend Container (Client)"]
-        ReactApp["React 18 SPA<br/>(Vite, React Router v6, Tailwind CSS)"]
-        ZustandStore["Zustand Global State Store<br/>(AuthSlice, ChatSlice)"]
-        SocketClient["Socket.IO Client Engine<br/>(WebSocket + Polling Transport)"]
-        AxiosClient["Axios HTTP Client<br/>(withCredentials: true)"]
-    end
+    subgraph ServerApp ["Backend Container - Node.js Process"]
+        ExpressServer["Express.js HTTP Server\nPort from process.env.PORT"]
+        SocketServer["Socket.IO Engine\nsocket.js - shared HTTP server"]
 
-    subgraph ServerApp ["Backend Container (App Server)"]
-        ExpressServer["Express.js HTTP Server<br/>(Port: 3000 / ENV)"]
-        SocketServer["Socket.IO Server Engine<br/>(socket.js)"]
-        
-        subgraph Middlewares ["Express Pipeline"]
-            HelmetMW["Helmet<br/>(Security Headers, CORP)"]
-            CorsMW["CORS Middleware<br/>(Origin Whitelist)"]
-            RateLimitMW["express-rate-limit<br/>(Brute-force Protection)"]
-            AuthMW["verifyToken Middleware<br/>(JWT Verification)"]
-            MulterMW["Multer<br/>(Disk Storage & MIME Filters)"]
+        subgraph Middlewares ["Express Middleware Pipeline"]
+            HelmetMW["helmet\nSecurity Headers, CORP: cross-origin"]
+            CorsMW["cors\nOrigin Whitelist from process.env.ORIGIN"]
+            RateLimitMW["express-rate-limit\nauthLimiter and searchLimiter"]
+            CookieMW["cookie-parser\nParses jwt cookie"]
+            AuthMW["verifyToken\nJWT signature check, injects req.userId"]
+            MulterMW["multer\nDisk Storage, MIME Filters"]
         end
 
-        subgraph Controllers ["Application Logic"]
-            AuthController["AuthController.js"]
-            ContactsController["ContactsController.js"]
-            MessagesController["MessagesController.js"]
-            ChannelController["ChannelController.js"]
+        subgraph Controllers ["Controllers"]
+            AuthCtrl["AuthController.js"]
+            ContactsCtrl["ContactsController.js"]
+            MessagesCtrl["MessagesController.js"]
+            ChannelCtrl["ChannelController.js"]
         end
 
-        SocketState["In-Memory UserSocketMap<br/>(Map&lt;UserId, SocketId&gt;)"]
+        SocketState["In-Memory userSocketMap\nMap from userId to socketId"]
     end
 
-    subgraph DataStorage ["Persistence & Storage Tier"]
-        MongoDB[("MongoDB Atlas Replica Set<br/>Collections: Users, Messages, Channels")]
-        DiskStorage[("Persistent Volume / Disk Storage<br/>uploads/profiles & uploads/files")]
+    subgraph DataStorage ["Persistence and Storage Tier"]
+        MongoDB[("MongoDB\nCollections: users, messages, channels")]
+        DiskStorage[("Local Filesystem\nuploads/profiles and uploads/files")]
     end
 
-    %% Network Connections
-    Browser -->|"HTTPS (Port 443)"| VercelCDN
-    VercelCDN -->|"Delivers HTML/JS/CSS Bundles"| ReactApp
-    Browser -->|"HTTPS (API Calls) & WSS (Sockets)"| ReverseProxy
-    ReverseProxy -->|"Proxy HTTP Requests"| ExpressServer
-    ReverseProxy -->|"Upgrade HTTP/1.1 to WebSocket"| SocketServer
+    Browser -->|"HTTPS Port 443"| VercelCDN
+    VercelCDN -->|"Serves HTML/JS/CSS bundle"| ReactApp
+    Browser -->|"HTTPS REST and WSS"| ReverseProxy
+    ReverseProxy -->|"Proxy HTTP"| ExpressServer
+    ReverseProxy -->|"HTTP Upgrade to WebSocket"| SocketServer
 
     ReactApp --> ZustandStore
     ReactApp --> AxiosClient
     ReactApp --> SocketClient
 
-    AxiosClient -->|"REST HTTP JSON / Multipart"| ExpressServer
-    SocketClient -->|"Bi-directional Event Stream (WSS)"| SocketServer
+    AxiosClient -->|"REST JSON and Multipart"| ExpressServer
+    SocketClient -->|"Bi-directional WSS Events"| SocketServer
 
-    ExpressServer --> HelmetMW --> CorsMW --> RateLimitMW
+    ExpressServer --> HelmetMW
+    HelmetMW --> CorsMW
+    CorsMW --> CookieMW
+    CookieMW --> RateLimitMW
+
     RateLimitMW --> AuthMW
     RateLimitMW --> MulterMW
 
-    AuthMW --> AuthController
-    AuthMW --> ContactsController
-    AuthMW --> MessagesController
-    AuthMW --> ChannelController
-    MulterMW --> MessagesController
+    AuthMW --> AuthCtrl
+    AuthMW --> ContactsCtrl
+    AuthMW --> MessagesCtrl
+    AuthMW --> ChannelCtrl
+    MulterMW --> MessagesCtrl
+    MulterMW --> AuthCtrl
 
     SocketServer --> SocketState
-    SocketServer -->|"Persists Direct/Channel Messages"| MongoDB
-    Controllers -->|"Mongoose ODM Queries / Aggregations"| MongoDB
-    MulterMW -->|"Saves Binary Chunks / Files"| DiskStorage
+    SocketServer -->|"Persists Direct and Channel Messages"| MongoDB
+    AuthCtrl -->|"Mongoose ODM"| MongoDB
+    ContactsCtrl -->|"Mongoose Aggregation"| MongoDB
+    MessagesCtrl -->|"Mongoose ODM"| MongoDB
+    ChannelCtrl -->|"Mongoose ODM"| MongoDB
+    MulterMW -->|"Saves uploaded files"| DiskStorage
 ```
 
 ---
@@ -102,56 +108,55 @@ The sequence diagram below traces the end-to-end lifecycle across security middl
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Alice as Client A (Sender)
-    participant Edge as Edge / Reverse Proxy
+    actor Alice as Client A Sender
+    participant Edge as Edge Reverse Proxy
     participant Auth as Express Auth Pipeline
     participant Socket as Socket.IO Engine
-    participant DB as MongoDB Atlas
-    actor Bob as Client B (Recipient)
+    participant DB as MongoDB
+    actor Bob as Client B Recipient
 
-    Note over Alice, DB: Phase 1: Authentication & Session Bootstrapping
-    Alice->>Edge: POST /api/auth/login { email, password }
+    Note over Alice,DB: Phase 1 - Authentication and Session Bootstrapping
+    Alice->>Edge: POST /api/auth/login with email and password
     Edge->>Auth: Forward to AuthController.login
-    Auth->>Auth: express-rate-limit validation (20 req / 15 min)
-    Auth->>DB: User.findOne({ email })
-    DB-->>Auth: Returns User record (hashed password)
-    Auth->>Auth: bcrypt.compare(password, user.password)
-    Auth->>Auth: jwt.sign({ email, userId }, JWT_KEY, expiresIn: 3d)
-    Auth-->>Alice: HTTP 200 OK + Set-Cookie: jwt=... (HttpOnly, Secure, SameSite=None)
+    Auth->>Auth: authLimiter check - 20 req per 15 min window
+    Auth->>DB: User.findOne with email field
+    DB-->>Auth: User record with hashed password
+    Auth->>Auth: bcrypt.compare plaintext vs hash - genSalt default 10 rounds
+    Auth->>Auth: jwt.sign with email and userId payload - expiresIn 3 days
+    Auth-->>Alice: HTTP 200 OK - Set-Cookie jwt HttpOnly Secure SameSite=None
 
-    Note over Alice, Socket: Phase 2: Authenticated WebSocket Connection Handshake
-    Alice->>Edge: GET /socket.io/?EIO=4&transport=websocket (Cookie: jwt=...)
-    Edge->>Socket: HTTP Upgrade: websocket
-    Socket->>Socket: io.use() Middleware: Extract cookie "jwt"
-    Socket->>Socket: jwt.verify(token, JWT_KEY) -> socket.userId = payload.userId
-    Socket->>Socket: userSocketMap.set(userId, socket.id)
-    Socket-->>Alice: WebSocket Handshake Acknowledged (connected)
+    Note over Alice,Socket: Phase 2 - Authenticated WebSocket Handshake
+    Alice->>Edge: Socket.IO connect with Cookie header containing jwt
+    Edge->>Socket: HTTP Upgrade to WebSocket
+    Socket->>Socket: io.use middleware - split cookie header string on semicolon
+    Socket->>Socket: jwt.verify token against JWT_KEY - attach socket.userId
+    Socket->>Socket: userSocketMap.set userId to socket.id
+    Socket-->>Alice: WebSocket connection acknowledged
 
-    Note over Bob, Socket: (Client B already authenticated and registered in userSocketMap)
+    Note over Bob,Socket: Client B already connected - registered in userSocketMap
 
-    Note over Alice, Bob: Phase 3: Direct Message Delivery Flow
-    Alice->>Socket: socket.emit("sendMessage", { recipient: BobId, content: "Hello", messageType: "text" })
-    Socket->>Socket: socket.on("sendMessage"): Verify socket.userId as sender
-    Socket->>DB: Messages.create({ sender: AliceId, recipient: BobId, content, messageType })
-    DB-->>Socket: Created Message Document (_id)
-    Socket->>DB: Messages.findById(_id).populate("sender recipient")
-    DB-->>Socket: Populated messageData (sanitized user fields)
-    
-    Socket->>Socket: Lookup recipientSocketId = userSocketMap.get(BobId)
-    Socket->>Socket: Lookup senderSocketId = userSocketMap.get(AliceId)
+    Note over Alice,Bob: Phase 3 - Direct Message Delivery
+    Alice->>Socket: socket.emit sendMessage with recipient BobId content and messageType text
+    Socket->>Socket: Overwrite message.sender with verified socket.userId - prevents spoofing
+    Socket->>DB: Messages.create with sender AliceId recipient BobId content messageType
+    DB-->>Socket: Created Message document with _id
+    Socket->>DB: Messages.findById _id .populate sender and recipient selecting id email firstName lastName image color
+    DB-->>Socket: Populated messageData object
 
-    opt Recipient is Online
-        Socket->>Bob: io.to(recipientSocketId).emit("recieveMessage", messageData)
+    Socket->>Socket: recipientSocketId = userSocketMap.get BobId
+    Socket->>Socket: senderSocketId = userSocketMap.get AliceId
+
+    opt Bob is online
+        Socket->>Bob: io.to recipientSocketId .emit recieveMessage with messageData
+    end
+    opt Alice socket still active
+        Socket->>Alice: io.to senderSocketId .emit recieveMessage with messageData
     end
 
-    opt Sender Socket Active
-        Socket->>Alice: io.to(senderSocketId).emit("recieveMessage", messageData)
-    end
-
-    Note over Alice, Bob: Phase 4: Reactive Client State Synchronization
-    Bob->>Bob: Zustand SocketContext: handleReceiveMessage()
-    Bob->>Bob: addMessage(message) -> updates selectedChatMessages
-    Bob->>Bob: addContactsInDMContact(message) -> shifts contact to top of list
+    Note over Alice,Bob: Phase 4 - Reactive Client State Sync
+    Bob->>Bob: SocketContext handleReceiveMessage callback fires
+    Bob->>Bob: addMessage - appends to selectedChatMessages in Zustand
+    Bob->>Bob: addContactsInDMContact - moves Alice to top of DM list
 ```
 
 ---
@@ -160,15 +165,15 @@ sequenceDiagram
 
 ChatX distributes state across four distinct tiers to balance operational latency, computational overhead, and durability.
 
-| Dimension | Client Memory | Server Session | Cache (In-Memory App State) | Persistent Database |
+| Dimension | Client Memory | Server Session | In-Process Cache | Persistent Database |
 | :--- | :--- | :--- | :--- | :--- |
-| **Component** | Zustand Store (`useAppStore`) | Stateless JWT Cookie | `userSocketMap` (`Map<string, string>`) | MongoDB Atlas Collections (`Users`, `Messages`, `Channels`) |
-| **Source of Truth** | Ephemeral UI Projection | Cryptographic Token (`jsonwebtoken`) | Node.js Process Memory | Primary Persistent Record |
-| **Entities Stored** | `userInfo`, `selectedChatType`, `selectedChatData`, `selectedChatMessages`, `directMessagesContacts`, `channels` | `userId`, `email`, `iat`, `exp` | Active `userId` to `socket.id` mappings | User profiles, BCrypt password hashes, text & file messages, channel memberships |
-| **Lifespan / TTL** | Browser Tab lifecycle (in-memory) | 3 Days (`maxAge = 259,200,000 ms`) | Connection lifecycle (destroyed on socket `disconnect`) | Indefinite / Immutable audit trail |
-| **Serialization** | Plain JavaScript Objects / Proxy | Signed Compact JWT string (`HS256`) | V8 Heap Hash Map | BSON Documents |
-| **Failure Impact** | UI reset; user prompted to reload or re-fetch `/user-info` | Request fails with `401 Unauthorized`; client redirects to `/auth` | Direct messages fall back to DB-only; real-time push fails until client reconnects | Complete outage for API and historical retrieval; real-time socket delivery halts |
-| **Sync Mechanism** | Updated via Axios REST responses and Socket.IO incoming events (`recieveMessage`, `recieve-channel-message`) | Injected by client on every HTTP request and WebSocket upgrade header | Synchronized on Socket.IO `connection` and `disconnect` events | Written via Mongoose models (`create`, `findByIdAndUpdate`, `aggregate`) |
+| **Component** | Zustand `useAppStore` | Stateless JWT Cookie (`jwt`) | `userSocketMap` (`Map<string, string>`) | MongoDB collections `users`, `messages`, `channels` |
+| **Source of Truth** | Ephemeral UI projection | Cryptographic token signed with `JWT_KEY` | Node.js V8 heap — single process only | Authoritative persistent record |
+| **Entities Stored** | `userInfo`, `selectedChatType`, `selectedChatData`, `selectedChatMessages`, `directMessagesContacts`, `channels` | `{ userId, email, iat, exp }` | Live `userId → socket.id` mappings for connected users | User profiles, bcrypt password hashes, text and file messages, channel memberships and message ID arrays |
+| **Lifespan / TTL** | Browser tab session (in-memory, not persisted) | 72 hours (`maxAge = 3 * 24 * 60 * 60 * 1000 = 259,200,000 ms`) | Socket connection lifecycle — entry on `connection`, deletion on `disconnect` | Indefinite (no TTL configured on any collection) |
+| **Serialization** | Plain JS objects via Zustand Proxy | HS256-signed compact JWT string | V8 Map in heap memory | BSON documents |
+| **Failure Impact** | UI resets; App.jsx re-fetches `GET /api/auth/user-info` on reload | Returns 401; client `PrivateRoute` redirects to `/auth` | Real-time push breaks — message is still persisted to DB but not delivered until client reconnects | Complete API and history outage; socket message creation also fails |
+| **Sync Mechanism** | Updated by Axios responses and Socket.IO events `recieveMessage` and `recieve-channel-message` | Injected automatically by browser on every HTTP request and WebSocket upgrade via Cookie header | Set on `io.on("connection")`, deleted in `disconnect` handler | Written via Mongoose `create`, `findByIdAndUpdate`, `$push` aggregation |
 
 ---
 
@@ -178,60 +183,53 @@ ChatX enforces defense-in-depth across multiple application boundaries:
 
 ```mermaid
 graph LR
-    subgraph External ["Untrusted Outer Boundary"]
-        PublicReq["Public Client Request"]
+    PublicReq["Public Client Request"]
+
+    subgraph Perimeter1 ["Perimeter 1 - Transport and Network"]
+        TLS["TLS Termination\nHTTPS and WSS at edge"]
+        CORS["CORS Filtering\nOrigin locked to process.env.ORIGIN\ncredentials: true"]
     end
 
-    subgraph EdgeSec ["Perimeter 1: Transport & Network"]
-        TLS["TLS 1.3 Termination<br/>(HTTPS / WSS)"]
-        CORS["Strict CORS Filtering<br/>Origin: process.env.ORIGIN<br/>Credentials: true"]
+    subgraph Perimeter2 ["Perimeter 2 - Application Shields"]
+        HelmetH["helmet\nSecurity Headers\nCORP: cross-origin"]
+        RL["express-rate-limit\nauthLimiter: 20 req per 15 min\nsearchLimiter: 30 req per 1 min"]
+        SizeLimit["Body Parser Cap\nJSON and URL-encoded: 1MB"]
     end
 
-    subgraph AppSec ["Perimeter 2: Application Shields"]
-        HelmetH["Helmet HTTP Headers<br/>(CORP: cross-origin)"]
-        RL["express-rate-limit<br/>Auth: 20 req/15m<br/>Search: 30 req/1m"]
-        SizeLimit["Body Parser Cap<br/>JSON / URL-encoded: 1MB"]
+    subgraph Perimeter3 ["Perimeter 3 - Identity and Integrity"]
+        JWTCookie["JWT Cookie Verification\nhttpOnly Secure SameSite=None\nverifyToken middleware"]
+        SocketAuth["Socket.IO io.use Guard\nCookie header parsed manually\njwt.verify on handshake"]
+        UploadSanitize["Multer MIME Allowlist\nProfile: 5MB JPEG PNG WebP GIF SVG\nFiles: 10MB images docs archives"]
+        RegexEsc["Regex Sanitization\nReDoS shield in searchContacts\nreplace special chars before RegExp"]
     end
 
-    subgraph AuthSec ["Perimeter 3: Identity & Integrity"]
-        JWTCookie["HttpOnly, Secure, SameSite=None<br/>JWT Cookie Verification"]
-        SocketAuth["Socket.IO Handshake Auth Guard"]
-        UploadSanitize["Multer MIME Type White-listing<br/>Disk Path Sanitization"]
-        RegexEsc["Regex Sanitization<br/>(Contacts Search ReDoS Shield)"]
-    end
-
-    subgraph CoreDomain ["Protected Domain Core"]
-        Handlers["Controller Business Logic & DB Operations"]
+    subgraph Core ["Protected Domain Core"]
+        Handlers["Controller Business Logic\nMongoose DB Operations"]
     end
 
     PublicReq --> TLS --> CORS --> HelmetH --> RL --> SizeLimit --> JWTCookie --> SocketAuth --> UploadSanitize --> RegexEsc --> Handlers
 ```
 
-### 1. Transport Layer Security (TLS/WSS) & CORS Whitelisting
-- All traffic in transit is encrypted using TLS 1.3 at the edge (Vercel and Render/Railway load balancers).
-- Cross-Origin Resource Sharing (CORS) is explicitly constrained in [server/index.js](file:///home/rishab/Personal/WebDev/ChatX/server/index.js#L47-L53) to `process.env.ORIGIN` (`http://localhost:5173` in local development or the production Vercel domain).
-- Express explicitly rejects unauthorized cross-origin preflight requests while permitting `GET, POST, PUT, PATCH, DELETE` verbs with `credentials: true`.
+### 1. Transport Layer Security & CORS Whitelisting
+- All traffic in transit is TLS-terminated at the edge (Vercel for the SPA, Render/Railway for the API).
+- CORS is explicitly constrained in [server/index.js L47–53](../server/index.js#L47-L53) to a single allowed origin (`process.env.ORIGIN`), with `credentials: true` and methods `GET, POST, PUT, PATCH, DELETE`.
 
-### 2. Rate Limiting & Denial-of-Service (DoS) Protection
-- **Authentication Routes**: Protected by `authLimiter` allowing a maximum of 20 requests per 15-minute sliding window on `/api/auth/login` and `/api/auth/signup` to prevent password brute-forcing and credential stuffing.
-- **Search Queries**: Protected by `searchLimiter` capping requests to 30 per minute on `/api/contacts/search` to protect MongoDB from resource exhaustion during user lookup.
-- **Payload Caps**: Body parser explicitly limits incoming JSON and URL-encoded bodies to `1MB` ([server/index.js](file:///home/rishab/Personal/WebDev/ChatX/server/index.js#L37-L38)).
+### 2. Rate Limiting & DoS Protection
+- **`authLimiter`**: Max 20 requests per 15-minute window applied to `/api/auth/login` and `/api/auth/signup` ([server/index.js L65–69, 83–84](../server/index.js#L65-L84)).
+- **`searchLimiter`**: Max 30 requests per 1-minute window on `/api/contacts/search` ([server/index.js L71–75, 85](../server/index.js#L71-L85)).
+- **Body cap**: `express.json({ limit: "1mb" })` and `express.urlencoded({ limit: "1mb" })` ([server/index.js L37–38](../server/index.js#L37-L38)).
 
-### 3. Stateless Cryptographic Session Management
-- Sessions rely on JSON Web Tokens signed with HMAC-SHA256 (`HS256`) using `process.env.JWT_KEY`.
-- Tokens are delivered exclusively via `Set-Cookie` with the following flags:
-  - `httpOnly: true`: Prevents client-side scripts from reading the token via `document.cookie`, mitigating XSS credential theft.
-  - `secure: true`: Mandates that cookies are only transmitted over HTTPS connections.
-  - `sameSite: "None"`: Allows credentialed cross-origin requests between the distinct client domain (Vercel) and API server (Render/Railway).
-  - `maxAge: 3 * 24 * 60 * 60 * 1000` (72 hours).
+### 3. Stateless JWT Session Management
+- Tokens are signed with HS256 using `process.env.JWT_KEY`. Payload: `{ email, userId }`.
+- Delivered as `Set-Cookie: jwt=...; HttpOnly; Secure; SameSite=None; Max-Age=259200`.
+- `httpOnly: true` prevents XSS token theft. `secure: true` blocks plaintext transmission. `sameSite: "None"` is required for cross-domain cookie transmission (Vercel ↔ Render).
 
 ### 4. Auth Context Injection & Socket Authentication
-- **REST Middleware**: [AuthMiddleware.js](file:///home/rishab/Personal/WebDev/ChatX/server/middlewares/AuthMiddleware.js#L3-L16) extracts `req.cookies.jwt`. If valid, it verifies the signature and injects `req.userId` directly into the request lifecycle. If missing or invalid, it returns `401 Unauthorized` or `403 Forbidden`.
-- **WebSocket Middleware**: [socket.js](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L18-L38) executes an `io.use()` handshake interceptor. It parses incoming cookie headers from the raw WebSocket HTTP upgrade request, verifies the token with `jwt.verify`, and binds `socket.userId`. Sockets lacking a valid token are rejected before establishing a connection.
-- **Sender Verification**: Incoming socket message events ([socket.js](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L170-L174)) enforce the authenticated user's ID as the sender (`{ ...message, sender: socket.userId }`), preventing sender spoofing.
+- **REST**: [`verifyToken`](../server/middlewares/AuthMiddleware.js#L3-L16) reads `req.cookies.jwt`, calls `jwt.verify`, and injects `req.userId`. Returns `401` if cookie absent, `403` if token invalid.
+- **WebSocket**: [`io.use()` in socket.js L18–38](../server/socket.js#L18-L38) manually splits `socket.handshake.headers.cookie` to extract the `jwt=` value, verifies it, and sets `socket.userId`. Connection is rejected pre-handshake if verification fails.
+- **Sender enforcement**: All `sendMessage` and `send-channel-message` handlers overwrite the `sender` field with `socket.userId` ([server/socket.js L170–174](../server/socket.js#L170-L174)), preventing client-side sender spoofing.
 
 ### 5. Input Sanitization & Upload Boundaries
-- **Regex Injection Prevention**: User input in [ContactsController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L22) undergoes strict regex escaping (`searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")`) before evaluation in MongoDB queries, neutralizing ReDoS (Regular Expression Denial of Service).
-- **File Upload Restrictions**:
-  - Profile Avatars: Multer restricts uploads to 5MB and validates MIME types to `['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']` ([server/routes/AuthRoutes.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/AuthRoutes.js#L10-L17)).
-  - Chat Attachments: Multer caps uploads to 10MB and validates MIME types to safe image, document, text, and archive formats ([server/routes/MessagesRoute.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/MessagesRoute.js#L6-L18)).
+- **ReDoS prevention**: `searchTerm` is escaped with `replace(/[.*+?^${}()|[\]\\]/g, "\\$&")` before constructing a `RegExp` ([server/controllers/ContactsController.js L22](../server/controllers/ContactsController.js#L22)).
+- **Profile avatars**: Multer allows `['image/jpeg','image/png','image/webp','image/gif','image/svg+xml']`, max 5 MB ([server/routes/AuthRoutes.js L21–25](../server/routes/AuthRoutes.js#L21-L25)).
+- **Chat file attachments**: Multer allows images, PDF, DOC/DOCX, TXT, ZIP, RAR; max 10 MB ([server/routes/MessagesRoute.js L20–25](../server/routes/MessagesRoute.js#L20-L25)).

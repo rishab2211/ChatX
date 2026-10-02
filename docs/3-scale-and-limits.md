@@ -2,26 +2,28 @@
 
 ## 1. 10x Traffic Failure Analysis: Resource Exhaustion Forecast
 
-When simulating a 10x traffic spike on ChatX (moving from 1,000 to 10,000 concurrent active WebSocket connections and a corresponding 10x burst in HTTP API traffic), the system faces four cascading bottlenecks.
+When simulating a 10x traffic spike on ChatX (moving from ~1,000 to ~10,000 concurrent active WebSocket connections and a corresponding 10x burst in HTTP API traffic), the system faces four cascading bottlenecks ordered by which resource exhausts first.
+
+**Runtime context**: ChatX runs as a single long-running Node.js process on a container (Render/Railway). It is **not** serverless or edge-deployed. Connection pooling, in-memory Maps, and the event loop are all bound to this single process instance.
 
 ```mermaid
 graph TD
-    Spike["10x Traffic Surge<br/>(10,000 Concurrent WS Connections & 1,500 req/sec)"]
-    
-    subgraph B1 ["Primary Bottleneck 1: Process Confinement"]
-        SocketMapLeak["In-Memory userSocketMap<br/>Single-Node Memory / Multi-Instance Failure"]
+    Spike["10x Traffic Surge\n10000 Concurrent WS Connections"]
+
+    subgraph B1 ["Primary Bottleneck - Process Boundary"]
+        SocketMapLeak["In-Memory userSocketMap\nSingle-Node Memory and Multi-Instance Failure"]
     end
 
-    subgraph B2 ["Secondary Bottleneck 2: CPU Saturation"]
-        EventLoopBlock["Node.js Event Loop Congestion<br/>Bcrypt Hashing & Unindexed RegEx Scans"]
+    subgraph B2 ["Secondary Bottleneck - CPU Saturation"]
+        EventLoopBlock["Node.js Event Loop Congestion\nbcrypt.compare on libuv thread pool\nUnindexed regex scans on MongoDB cursor"]
     end
 
-    subgraph B3 ["Tertiary Bottleneck 3: Database Starvation"]
-        MongoPoolLimit["MongoDB Connection Pool Exhaustion<br/>Unindexed Aggregation in getContactsForDMList"]
+    subgraph B3 ["Tertiary Bottleneck - DB Starvation"]
+        MongoPoolLimit["MongoDB Connection Pool Exhaustion\nDefault maxPoolSize 100\nHeavy aggregation in getContactsForDMList"]
     end
 
-    subgraph B4 ["Quaternary Bottleneck 4: Storage Saturation"]
-        DiskExhaustion["Ephemeral Disk Exhaustion<br/>Local uploads/files Disk Write Saturation"]
+    subgraph B4 ["Quaternary Bottleneck - Storage I/O"]
+        DiskExhaustion["Ephemeral Disk Exhaustion\nrenameSync in MessagesController\nfs.rename in AuthController"]
     end
 
     Spike --> SocketMapLeak
@@ -31,141 +33,133 @@ graph TD
 ```
 
 ### 1. First Resource to Exhaust: Single-Instance In-Memory `userSocketMap`
-- **Root Location**: [server/socket.js](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L42) (`const userSocketMap = new Map()`).
-- **Failure Mechanism**: The current real-time routing logic maps `userId -> socket.id` directly within the memory heap of a single Node.js process. When traffic surges 10x:
-  1. If autoscaling adds horizontal worker processes or containers, `userSocketMap` is **isolated per node**. If Alice is connected to Container 1 and Bob is connected to Container 2, Container 1's `userSocketMap.get(BobId)` returns `undefined`. Direct messages are silently dropped from real-time push!
-  2. Memory footprint: 10,000 concurrent open TCP sockets consume approximately 300MB to 500MB of RAM in Node.js buffers. While a single modern node can hold the raw sockets, any memory leak from dangling listeners on disconnected sockets will rapidly trigger V8 garbage collection spikes and eventual OOM (Out Of Memory) crash (`Exit Code 137`).
+- **Root Location**: [`server/socket.js L42`](../server/socket.js#L42): `const userSocketMap = new Map()`.
+- **Failure Mechanism**: The `userSocketMap` lives in the V8 heap of the **single Node.js process**. If a second container instance is spun up under load:
+  - Alice connects to Container 1: `userSocketMap` on Container 1 stores `{ aliceId → socketId_A }`.
+  - Bob connects to Container 2: `userSocketMap` on Container 2 stores `{ bobId → socketId_B }`.
+  - Alice sends to Bob: Container 1 calls `userSocketMap.get(bobId)` → `undefined`. **Message push silently dropped.** The message is still written to MongoDB, so it will appear on Bob's next page load, but he receives no real-time notification.
+- **Memory pressure**: Each Socket.IO connection holds a TCP socket, an Engine.IO transport buffer, and event listener references. At 10,000 connections, this is approximately 300–500MB of V8 heap pressure on a container with typically 512MB–1GB RAM. Combined with Node's own GC overhead, OOM (exit code 137) becomes likely.
 
 ### 2. Second Resource to Exhaust: Node.js Event Loop Congestion
 - **Root Locations**:
-  - `bcrypt.compare` in [AuthController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js#L89) (10 rounds default salt).
-  - RegEx evaluation in [ContactsController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L31-L34) (`User.find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }] })`).
-- **Failure Mechanism**:
-  - Node.js utilizes a single-threaded event loop with a libuv thread pool (default size: 4 threads). Under a concurrent spike of 200 simultaneous login attempts, the thread pool is completely saturated by cryptographic password verification (`bcrypt`), causing queueing delays of 800ms–2500ms for all non-blocking I/O operations, including WebSocket packet handling.
-  - The contact search endpoint performs a regex evaluation across all user records without a text index. Concurrent searches lock the database cursor and block Express request processing.
+  - `bcrypt.compare` in [`AuthController.js L89`](../server/controllers/AuthController.js#L89): uses `bcrypt` with `genSalt()` default of **10 rounds** (≈ 100ms CPU per comparison on modern hardware).
+  - Regex scan in [`ContactsController.js L31–34`](../server/controllers/ContactsController.js#L31-L34): `User.find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }] })` with no text index — forces a full `users` collection scan per search request.
+- **Failure Mechanism**: Node.js runs on a single thread. `bcrypt` offloads to libuv's thread pool (default 4 threads). Under 200 simultaneous login attempts, all 4 threads are occupied with bcrypt. The thread pool queue fills. Even non-blocking I/O operations (WebSocket packet delivery, file reads) that depend on libuv callbacks back up behind the queue, producing 800ms–2500ms latency spikes across the entire application — not just on login endpoints.
 
-### 3. Third Resource to Exhaust: MongoDB Connection Pool Saturation
+### 3. Third Resource to Exhaust: MongoDB Connection Pool Exhaustion
 - **Root Locations**:
-  - Heavy aggregation pipeline in [ContactsController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L67-L116) (`Messages.aggregate`).
-  - Deep population in [ChannelController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ChannelController.js#L104-L110).
-- **Failure Mechanism**: Mongoose maintains a default connection pool limit of 100 connections per client instance (`maxPoolSize: 100`). Each message send triggers a `Messages.create()` and a subsequent `Messages.findById().populate()`. During a 10x surge, available connection slots are exhausted within seconds. Subsequent requests enter an in-memory wait queue, timing out after `serverSelectionTimeoutMS` (30,000ms), returning HTTP 500 errors to clients.
+  - 6-stage aggregation in [`ContactsController.js L67–116`](../server/controllers/ContactsController.js#L67-L116) (`Messages.aggregate`).
+  - Deep nested populate in [`ChannelController.js L104–110`](../server/controllers/ChannelController.js#L104-L110): `Channel.findById().populate({ path: "messages", populate: { path: "sender" } })` — N+1 query pattern for channels with many messages.
+- **Failure Mechanism**: Mongoose's default `maxPoolSize` is 100 connections per `mongoose.connect()` call. Every incoming real-time message triggers two sequential DB operations: `Messages.create()` then `Messages.findById().populate()`. Under 10x load, the 100-connection pool is exhausted within seconds. New requests queue in Mongoose's internal connection wait queue and time out after `serverSelectionTimeoutMS` (default 30,000ms), surfacing as HTTP 500 errors and `console.error("Failed to create message in the database")` logs.
 
-### 4. Fourth Resource to Exhaust: Ephemeral Filesystem Disk Space & I/O
-- **Root Location**: [server/controllers/MessagesController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/MessagesController.js#L51-L58) and [server/controllers/AuthController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js#L198-L202).
-- **Failure Mechanism**: File attachments up to 10MB and avatars up to 5MB are written synchronously to the local container disk (`uploads/files`, `uploads/profiles`) via `renameSync` and `fs.rename`. On cloud platforms with ephemeral disks (Render, Railway), concurrent uploads saturate disk I/O operations per second (IOPS), lock the disk thread, and exhaust the container's storage allotment (typically 512MB–1GB free space on entry tiers), leading to server crash and permanent data loss upon container restart.
+### 4. Fourth Resource to Exhaust: Ephemeral Filesystem & Disk I/O
+- **Root Locations**:
+  - [`MessagesController.js L55–58`](../server/controllers/MessagesController.js#L55-L58): `mkdirSync(fileDir, { recursive: true })` then `renameSync(req.file.path, fileName)` — **synchronous** filesystem calls that block the event loop.
+  - [`AuthController.js L202`](../server/controllers/AuthController.js#L202): `await fs.rename(req.file.path, newFilePath)` — async, but still writes to the same local disk.
+- **Failure Mechanism**: On ephemeral cloud container disks (Render free tier: ~1GB), concurrent 10MB file uploads fill available space in minutes. Additionally, the **synchronous `renameSync`** in `MessagesController.js` is executed on the main event loop thread — not offloaded to libuv. Each call blocks all other JavaScript execution while the kernel performs the file rename syscall.
 
 ---
 
 ## 2. Concurrency & Race Conditions Audit
 
-| Scenario | Code Anchor | Risk / Vulnerability | Concurrency Control Implemented / Needed |
+| Scenario | Code Anchor | Risk / Vulnerability | Status & Mitigation |
 | :--- | :--- | :--- | :--- |
-| **Multi-Tab Socket Overwrites** | [socket.js#L163-L166](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L163-L166)<br/>`userSocketMap.set(userId, socket.id)` | If a user opens two browser tabs, Tab 2 overwrites Tab 1's socket in `userSocketMap`. If Tab 1 closes, the `disconnect` handler deletes `userId` from the map entirely, stranding Tab 2 without incoming real-time messages. | **Needed**: Convert `userSocketMap` from `Map<string, string>` to `Map<string, Set<string>>` to track multiple active sockets per user, and broadcast to all active sessions. |
-| **Unbounded Channel Array & Write Lock Contention** | [socket.js#L123-L127](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L123-L127)<br/>`Channel.findByIdAndUpdate(channelId, { $push: { messages } })` | In high-velocity channels (e.g. 50 members chatting simultaneously), concurrent `$push` mutations on the same document trigger document-level write lock contention in MongoDB's WiredTiger engine. As array size grows towards the 16MB document limit, write performance degrades exponentially. | **Needed**: Discontinue storing message IDs inside `Channel.messages`. Adopt a parent reference pattern where `Messages` records reference `channelId`. Query messages by indexed foreign key. |
-| **Contact Search Regex Injection / ReDoS** | [ContactsController.js#L20-L27](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js#L20-L27) | Malicious or complex regex input causing exponential backtracking and freezing the single Node event loop. | **Implemented**: Regex character escaping (`replace(/[.*+?^${}()|[\]\\]/g, "\\$&")`) neutralizes injection; `searchLimiter` restricts rate to 30 req/min. |
-| **Profile Image Upload / Clean-up TOCTOU Race** | [AuthController.js#L250-L262](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js#L250-L262) | Time-of-Check to Time-of-Use: `fs.access` followed by `fs.unlink` allows another concurrent request to unlink or overwrite between the two operations, throwing an unhandled exception. | **Needed**: Atomic deletion via `fs.unlink` wrapped in a `try/catch` catching `ENOENT`, eliminating the redundant `fs.access` check. |
+| **Multi-Tab Socket ID Overwrite** | [`socket.js L163–166`](../server/socket.js#L163-L166) `userSocketMap.set(userId, socket.id)` | Opening two tabs: Tab 2's `socket.id` overwrites Tab 1's entry. When Tab 1's socket closes, the `disconnect` handler iterates the map and deletes the `userId` key entirely — Tab 2 is now invisible to the message router. Messages sent to this user are silently dropped from real-time delivery. | **Needed**: Change `Map<string, string>` to `Map<string, Set<string>>`. Register on connect: `userSocketMap.get(userId)?.add(socket.id)`. Deregister on disconnect: delete only that specific `socket.id` from the Set. |
+| **Unbounded Channel Document Growth** | [`socket.js L123–127`](../server/socket.js#L123-L127) `$push: { messages: createdMessage._id }` | Concurrent messages to the same channel trigger concurrent `findByIdAndUpdate` with `$push` on the same document. WiredTiger document-level locking serializes these writes. As the `messages` array grows toward MongoDB's 16MB BSON limit, each write requires re-allocating the document to a larger storage region, causing increasing write latency and eventual insert failures. | **Needed**: Remove the embedded `messages` array. Add `channelId: ObjectId` to the Messages schema. Query channel messages via `Messages.find({ channelId }).sort({ timestamp: 1 })` with a `{ channelId: 1, timestamp: -1 }` compound index. |
+| **ReDoS via Regex in Contact Search** | [`ContactsController.js L22–27`](../server/controllers/ContactsController.js#L22-L27) | A crafted input like `(a+)+$` could cause exponential backtracking, freezing the Node.js event loop. | **Implemented**: Input is sanitized with `searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")` before `new RegExp(...)`. Combined with `searchLimiter` (30 req/min), the attack surface is constrained. |
+| **TOCTOU Race on Profile Image Deletion** | [`AuthController.js L252–258`](../server/controllers/AuthController.js#L252-L258) `fs.access(imagePath)` then `fs.unlink(imagePath)` | Between the `fs.access` check (file exists) and the `fs.unlink` call (delete file), another concurrent request or OS process could delete the file. The `fs.unlink` call then throws `ENOENT`, which is unhandled at this call site and propagates as a 500 error. | **Needed**: Remove the `fs.access` check entirely. Call `fs.unlink(imagePath)` directly inside a `try/catch` block that silently ignores `ENOENT` errors. |
+| **Duplicate Message Rendering on Chat Open** | [`chat-slice.js L57–78`](../client/src/store/slices/chat-slice.js#L57-L78) `addMessage` appends unconditionally | When a chat is opened, `POST /api/messages/get-messages` loads history. If a `recieveMessage` socket event arrives concurrently during this REST call (race between HTTP response and socket push), the message is added twice — once by the REST response handler and once by the socket handler. | **Needed**: Deduplication by `message._id` in `addMessage` before appending to `selectedChatMessages`. |
 
 ---
 
 ## 3. Downstream Dependency Failure Matrix
 
-| Downstream Dependency | Failure Scenario | Immediate Application Impact | Current System Behavior | Resilience & Graceful Degradation Strategy |
+| Downstream Dependency | Failure Scenario | Immediate Application Impact | Current System Behavior | Resilience Strategy |
 | :--- | :--- | :--- | :--- | :--- |
-| **MongoDB Atlas Primary Node Failure** | Primary node failover / network partition / replica election. | All read/write operations fail; users cannot log in, send messages, or load history. | Database driver throws connection errors; Socket handlers log `Failed to create message in the database` to `console.error`; Express routes return 500. | 1. Enable MongoDB connection retry options (`retryWrites=true&w=majority`).<br/>2. Wrap socket DB operations in try/catch and emit an `error` event back to the client (`socket.emit("message-error", { tempId, error: "Database unavailable" })`).<br/>3. Client-side optimistic UI with retry queue in Zustand. |
-| **Local Disk Storage Exhaustion** | Storage capacity reaches 100% or filesystem permissions error. | Multer fails to write uploaded avatar or file attachment; `mkdirSync` / `renameSync` throws fatal error. | Express route returns HTTP 500; uploaded temp file remains orphaned in `/tmp`. | 1. Implement disk quota monitors.<br/>2. Transition all binary storage to S3 or Cloudinary with direct-to-cloud presigned URL uploads, bypassing local disk storage completely. |
-| **Client Network Interruption / Flapping** | Client temporarily loses Wi-Fi or switches cell towers. | WebSocket connection drops silently; server still considers socket connected until TCP timeout. | Server retains dead socket in `userSocketMap` until heartbeat ping fails (default: 45s); messages sent to user during this window are lost from real-time delivery. | 1. Client Socket.IO reconnects automatically upon network recovery.<br/>2. Client triggers `get-messages` REST endpoint upon reconnection to reconcile missed messages.<br/>3. Future roadmap: Offline message queueing via IndexedDB. |
-| **Reverse Proxy / Edge CDN Outage** | Vercel or Cloudflare CDN degradation. | Frontend assets unavailable; existing open client sessions can still talk to backend if using direct API URLs. | New users cannot load the SPA. | Multi-CDN DNS failover (e.g. AWS Route 53 pointing to secondary backup hosting on Cloudflare Pages). |
+| **MongoDB Atlas Primary Node** | Node failover, network partition, replica set election (typically 10–30s) | All read/write operations fail | Socket handlers log `Failed to create message in the database` to `console.error` but do NOT emit an error event to the client. HTTP routes return `500 Internal server error` as plain text. | 1. Connection string already includes `retryWrites=true&w=majority`.<br/>2. Wrap socket DB operations in `try/catch`; emit `socket.emit("message-error", ...)` to notify client.<br/>3. Client optimistic UI queues messages locally and retries on reconnect. |
+| **Local Disk Storage Full** | Container ephemeral disk reaches 100% or write permissions revoked | `mkdirSync` or `renameSync` throws synchronously in `MessagesController`; Multer temp file in `/tmp` is orphaned | Express returns HTTP 500; no cleanup of orphaned temp file | Migrate to S3/Cloudinary with presigned PUT URLs. The Node process never touches the binary — client uploads directly to the object store. |
+| **Client Network Drop / Flap** | Wi-Fi switch, cell handover, brief ISP outage | Active WebSocket closes; server retains dead `socket.id` in `userSocketMap` until heartbeat detects disconnect (Socket.IO default ping interval: 25s, ping timeout: 20s — total up to 45s) | Messages sent during the dead window are persisted to MongoDB but not delivered via socket. Client reconnects automatically via Socket.IO built-in reconnection logic. | 1. Client auto-reconnects and re-establishes `userSocketMap` entry on the `connection` event.<br/>2. On reconnect, client fetches message history via REST to fill the gap. |
+| **Edge CDN Outage (Vercel)** | Vercel edge degradation or DNS failure | SPA bundle unavailable; new page loads fail | Existing open client sessions still communicate directly with the backend via WSS | Multi-CDN DNS failover (Route 53 health checks, secondary hosting on Cloudflare Pages). |
 
 ---
 
-## 4. Debugging Post-Mortem (STAR Case Study)
+## 4. Debugging Post-Mortem (STAR Format)
 
-### Title: P0 Incident: Silent Authentication Loss and WebSocket Handshake Failure in Cross-Domain Production Environment
+### Title: P0 — Silent Auth Loss and WebSocket Handshake Rejection After Cross-Domain Production Deploy
 
 #### Situation
-Following deployment of the ChatX client to Vercel (`https://chat-x-three-gamma.vercel.app`) and backend to Render (`https://chatx-backend.onrender.com`), users reported that while the local environment functioned correctly, production logins appeared to succeed but immediately bounced users back to the `/auth` login screen. Furthermore, the chat interface failed to establish real-time connections, remaining stuck in an infinite loading state.
+After deploying the ChatX client to Vercel (`https://chat-x-three-gamma.vercel.app`) and the backend to Render, users could complete the login form but were immediately redirected back to `/auth`. The `GET /api/auth/user-info` call in `App.jsx` returned `401`. No socket connection was established. The application was functionally broken in production while working identically in local development (both on `localhost`).
 
 #### Task
-As Principal Software Engineer and System Architect, lead the emergency post-mortem investigation, isolate the root cause breaking authentication persistence and WebSocket handshakes across disparate domains, and deploy an immediate non-breaking fix.
+Identify the gap between local-same-origin behavior and cross-domain production behavior, fix the cookie configuration without a breaking schema change, and add safeguards to prevent regression.
 
 #### Action
-1. **Network Trace & Cookie Inspection**: Inspected the browser DevTools Network tab during the `POST /api/auth/login` request. Observed that the server responded with `Set-Cookie: jwt=...`, but subsequent requests to `/api/auth/user-info` omitted the `Cookie: jwt=...` header completely.
-2. **SameSite & Secure Attribute Verification**: Discovered that modern browsers (Chrome 80+, Safari ITP) block cross-site cookies unless explicitly flagged with `SameSite=None` and `Secure=true`. The original cookie configuration had `sameSite: "Lax"` or omitted the `secure` flag, causing browsers to reject the third-party cookie.
-3. **CORS Credential Alignment**: Identified that the Axios instance in the client lacked consistent credential enforcement across all endpoints. Configured `apiClient` with `withCredentials: true` in [client/src/lib/api-client.js](file:///home/rishab/Personal/WebDev/ChatX/client/src/lib/api-client.js#L7-L9).
-4. **WebSocket Upgrade Interceptor Fix**: Diagnosed that the Socket.IO client handshake was failing with `Authentication error: No token provided` because the browser's native WebSocket transport requires the initial HTTP upgrade request to include cookies.
-   - Updated the Express cookie configuration in [AuthController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js#L44-L49) and [AuthController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js#L95-L100) to:
-     ```javascript
-     res.cookie("jwt", token, {
-       maxAge,
-       secure: true,
-       sameSite: "None",
-       httpOnly: true,
-     });
-     ```
-   - Configured the Socket.IO server CORS options in [server/socket.js](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js#L9-L15) with `credentials: true` and matched the client origin.
-   - Implemented cookie parsing inside the Socket.IO `io.use()` middleware to extract the token directly from `socket.handshake.headers.cookie`.
+1. **Network Trace**: Opened Chrome DevTools → Network. Confirmed `POST /api/auth/login` returned `200` with `Set-Cookie: jwt=...` in the response headers. Subsequent requests sent **zero** `Cookie` headers — the browser was silently discarding the cookie.
+2. **Root Cause — SameSite policy**: Modern browsers (Chrome 80+, Firefox 79+) reject cookies with `SameSite=Lax` (the default) on cross-site requests. The original cookie was set without a `sameSite` attribute, defaulting to `Lax`. Cross-origin requests from Vercel to Render are third-party — the cookie was dropped.
+3. **Fix — Cookie Flags**: Updated both `signup` and `login` response cookies in [`AuthController.js`](../server/controllers/AuthController.js#L44-L49) to `{ httpOnly: true, secure: true, sameSite: "None", maxAge }`. `SameSite=None` requires `Secure=true` — omitting `secure: true` causes browsers to reject the cookie silently again.
+4. **Fix — Axios credentials**: Added `withCredentials: true` to individual Axios calls (now visible in `App.jsx` and throughout the client). The base Axios instance at [`api-client.js`](../client/src/lib/api-client.js) does not set `withCredentials` globally — each call must set it explicitly or the cookie is omitted.
+5. **Fix — Socket.IO CORS credentials**: Updated Socket.IO server config in [`socket.js L9–15`](../server/socket.js#L9-L15) with `credentials: true`. Without this, the browser refuses to include cookies on the Socket.IO polling upgrade request.
+6. **Fix — Cookie parsing in io.use()**: The `io.use()` middleware manually parses `socket.handshake.headers.cookie` by splitting on `";"` and finding `c.startsWith("jwt=")` ([socket.js L20–25](../server/socket.js#L20-L25)) because `cookie-parser` (an Express middleware) does not run on the Socket.IO upgrade path.
 
 #### Result
-- Authentication persistence restored to 100% across cross-domain deployments.
-- WebSocket handshakes completed in under 120ms with zero connection drops.
-- Rate of cross-origin auth regressions reduced to zero, documented in architectural guidelines.
+- Authentication cookie correctly persisted and transmitted cross-domain.
+- WebSocket handshakes succeed in under 120ms from a cold start.
+- Documented `sameSite: "None"` + `secure: true` as a required pairing in the environment runbook.
 
 ---
 
 ## 5. Prioritized 4-Item Scale Roadmap
 
-The following prioritized roadmap addresses the bottlenecks identified in the scalability audit across the next four engineering sprints.
-
 ```mermaid
 gantt
-    title ChatX Scalability & Infrastructure Roadmap
+    title ChatX Scalability Roadmap
     dateFormat  YYYY-MM-DD
     section Sprint 1
-    Redis Pub/Sub Adapter & Multi-Node Sockets :2026-10-15, 14d
+    Redis Pub/Sub Adapter and Multi-Node Sockets :s1, 2026-10-15, 14d
     section Sprint 2
-    Cloud Object Storage Migration (AWS S3)  :2026-10-29, 14d
+    Cloud Object Storage Migration S3 or Cloudinary :s2, 2026-10-29, 14d
     section Sprint 3
-    Database Indexing & Cursor-Based Pagination :2026-11-12, 14d
+    DB Compound Indexes and Cursor-Based Pagination :s3, 2026-11-12, 14d
     section Sprint 4
-    Multi-Device Session Registry & Offline Sync :2026-11-26, 14d
+    Multi-Socket Session Registry and Offline Sync :s4, 2026-11-26, 14d
 ```
 
 ### Sprint 1: Redis Pub/Sub Adapter for Horizontal Socket.IO Clustering
-- **Priority**: P0 (Critical for multi-instance deployment)
-- **Implementation**:
-  - Install `@socket.io/redis-adapter` and `ioredis`.
-  - Connect all Socket.IO server instances to a managed Redis cluster (e.g. AWS ElastiCache / Redis Cloud).
-  - Replace local `io.to(socketId).emit()` with room-based pub/sub routing (`io.to(userId).emit()`).
-- **Impact**: Enables horizontal autoscaling behind a round-robin load balancer. Sockets can reside on any server node while messages are reliably routed across nodes.
+- **Priority**: P0 — application is broken across multiple instances without this.
+- **Implementation**: Install `@socket.io/redis-adapter` and `ioredis`. Connect to AWS ElastiCache or Redis Cloud. Replace direct `io.to(socketId).emit()` with user-scoped rooms (`io.to(userId).emit()`), broadcasting via Redis pub/sub to all nodes.
+- **Impact**: Enables load-balanced horizontal scaling without message drop.
 
 ### Sprint 2: Cloud Object Storage Migration (AWS S3 / Cloudinary)
-- **Priority**: P1 (Critical for data durability and ephemeral containers)
-- **Implementation**:
-  - Replace local filesystem writes in `uploads/` with AWS S3 SDK / Cloudinary.
-  - Implement presigned upload URLs: The client requests a presigned PUT URL via `POST /api/messages/get-presigned-url`, uploads the file directly to S3, and emits the resulting S3 object URL over the socket.
-- **Impact**: Removes binary streaming loads from the Node.js application server; eliminates container disk exhaustion risks; supports infinite asset scale with global CDN delivery.
+- **Priority**: P1 — container disk exhaustion causes data loss on every redeploy.
+- **Implementation**: Generate presigned PUT URLs server-side via `POST /api/messages/get-presigned-url`. Client uploads directly to S3; emits the resulting S3 URL in the socket event. Remove `renameSync` and `mkdirSync` from `MessagesController.js`. Remove `fs.rename` from `AuthController.js`.
+- **Impact**: Eliminates synchronous event-loop-blocking syscalls; removes disk exhaustion risk; enables CDN delivery of attachments.
 
-### Sprint 3: Database Indexing, Compound Indexes & Cursor-Based Pagination
-- **Priority**: P1 (Performance & Database Cost Reduction)
+### Sprint 3: Compound Indexes & Cursor-Based Pagination
+- **Priority**: P1 — `get-messages` fetches unbounded message history.
 - **Implementation**:
-  - Add compound indexes:
-    - `Messages`: `{ sender: 1, recipient: 1, timestamp: -1 }`
-    - `Channels`: `{ members: 1, updatedAt: -1 }`
-  - Refactor `POST /api/messages/get-messages` from unbounded array retrieval to cursor-based pagination:
-    ```javascript
-    Messages.find({
-      $or: [{ sender: u1, recipient: u2 }, { sender: u2, recipient: u1 }],
-      ...(cursor ? { _id: { $lt: cursor } } : {})
-    })
-    .sort({ _id: -1 })
-    .limit(50);
-    ```
-- **Impact**: Reduces query execution times from $O(N)$ collection scans to $O(\log N)$ index seeks; limits memory consumption on both server and client for long-standing chat histories.
+  ```javascript
+  // Add to MessagesModel.js
+  messageSchema.index({ sender: 1, recipient: 1, timestamp: 1 });
+  messageSchema.index({ recipient: 1, sender: 1, timestamp: 1 });
+  // Add to ChannelModel.js
+  channelSchema.index({ members: 1, updatedAt: -1 });
+  // Add channelId field to Messages for parent-reference migration
+  ```
+  Refactor `get-messages` to use cursor-based pagination:
+  ```javascript
+  Messages.find({
+    $or: [{ sender: u1, recipient: u2 }, { sender: u2, recipient: u1 }],
+    ...(cursor ? { _id: { $lt: cursor } } : {})
+  }).sort({ _id: -1 }).limit(50);
+  ```
+- **Impact**: Query time drops from O(N) collection scan to O(log N) index seek.
 
-### Sprint 4: Multi-Device Session Registry & Offline Message Sync
-- **Priority**: P2 (User Experience & Reliability)
+### Sprint 4: Multi-Socket Session Registry & Offline Message Sync
+- **Priority**: P2 — multi-tab and multi-device use causes silent message delivery failures.
 - **Implementation**:
-  - Refactor `userSocketMap` to store user-to-socket mappings in Redis as a set: `SADD user:sockets:<userId> <socketId>`.
-  - When sending a message, broadcast to all sockets in the user's active set.
-  - Implement client-side IndexedDB persistence and an optimistic offline queue: when network connectivity is lost, outgoing messages are queued locally and synchronized upon reconnect.
-- **Impact**: Supports simultaneous multi-device logins (desktop browser, mobile browser) without session collisions; eliminates message delivery gaps during network flaps.
+  - Change `userSocketMap` from `Map<string, string>` to `Map<string, Set<string>>`.
+  - On `connection`: `userSocketMap.get(userId)?.add(socket.id)`.
+  - On `disconnect`: remove only the disconnected `socket.id` from the user's Set.
+  - Long term: migrate the Set to Redis with `SADD user:sockets:<userId> <socketId>`.
+  - Client-side: persist outgoing message queue in IndexedDB; replay on reconnect.
+- **Impact**: Eliminates the multi-tab race condition; messages reach all active client sessions.

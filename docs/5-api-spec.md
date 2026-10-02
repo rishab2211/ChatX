@@ -2,103 +2,104 @@
 
 ## 1. Global Error Response Standard
 
-ChatX standardizes error delivery across all RESTful API endpoints. All failure responses use standard HTTP status codes accompanied by an informative, machine-readable JSON envelope.
+> **Implementation Note**: ChatX's controllers do **not** implement a uniform JSON error envelope. Most error responses are plain text strings sent via `res.send()` (e.g., `res.status(400).send("Email and Password are required")`). Only rate limiter errors and a subset of controller errors return JSON objects. The schema below documents the **ideal target schema** for a future standardization sprint, alongside the actual response shapes currently emitted.
 
-### JSON Error Schema
+### Actual Error Response Shapes (Current)
+
+| Pattern | Example | Used In |
+| :--- | :--- | :--- |
+| Plain text string | `"Email and Password are required"` | Most auth, contacts, messages, channels controllers |
+| JSON object with `error` key | `{ "error": "Too many authentication attempts..." }` | `express-rate-limit` response |
+| JSON object with `message` key | `{ "message": "No file uploaded." }` | `addProfileImage` controller |
+| JSON object with `error` key | `{ "error": "Route not found" }` | 404 handler in `index.js` |
+| JSON object with `error` key | `{ "error": "Internal server error" }` | Global error handler in `index.js` |
+
+### Target JSON Error Schema (Recommended for Standardization)
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GlobalErrorResponse",
   "type": "object",
   "properties": {
-    "success": {
-      "type": "boolean",
-      "const": false
-    },
     "error": {
       "type": "string",
-      "description": "Human-readable error description or localized message"
+      "description": "Human-readable error message"
     },
     "code": {
       "type": "string",
-      "description": "Standardized programmatic error code (e.g. AUTH_FAILED, VALIDATION_ERROR)"
+      "description": "Programmatic error code e.g. AUTH_FAILED, VALIDATION_ERROR"
     },
     "statusCode": {
       "type": "integer",
-      "description": "HTTP status code matching the response header"
-    },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "ISO-8601 UTC timestamp of error generation"
+      "description": "HTTP status code mirroring the response status"
     }
   },
-  "required": ["success", "error", "statusCode"]
+  "required": ["error"]
 }
 ```
 
 ### HTTP Status Code Mapping
-| Status Code | Meaning | Example Trigger Scenario |
+| Status Code | Meaning | ChatX Example |
 | :--- | :--- | :--- |
-| **`200 OK`** | Request fulfilled successfully | Profile updated, contact list fetched, messages retrieved |
-| **`201 Created`** | Resource created successfully | New user registered, channel created |
-| **`400 Bad Request`** | Syntactic or validation failure | Missing email/password, password under 8 characters, missing file |
-| **`401 Unauthorized`** | Authentication credentials absent or invalid | Missing JWT cookie, expired session token |
-| **`403 Forbidden`** | Authenticated user lacks permission | User attempting to read messages of a channel they do not belong to |
-| **`404 Not Found`** | Requested resource does not exist | User email not registered, channel ID does not exist |
-| **`409 Conflict`** | State conflict with existing database records | Attempting signup with an email that is already registered |
-| **`429 Too Many Requests`** | Rate limit threshold exceeded | Exceeding 20 login attempts in 15 minutes or 30 searches in 1 minute |
-| **`500 Internal Error`** | Unhandled exception on server | Database connection drop, filesystem I/O write failure |
+| **`200 OK`** | Request fulfilled | Profile updated, contacts fetched, messages retrieved |
+| **`201 Created`** | Resource created | User registered (`signup`), channel created |
+| **`400 Bad Request`** | Validation failure | Missing email/password, password under 8 chars, no file in upload, invalid members |
+| **`401 Unauthorized`** | Missing JWT cookie | `req.cookies.jwt` is absent — `verifyToken` returns `"You are not authenticated, login or signup first!"` |
+| **`403 Forbidden`** | Invalid JWT signature or expired token | `jwt.verify` fails — returns `"Token is not valid"`. Also returned by `getChannelMessages` if user is not a member or admin. |
+| **`404 Not Found`** | Resource does not exist | Email not registered in `login`, user not found in `getUserInfo`, channel not found |
+| **`409 Conflict`** | Duplicate resource | Email already registered — `signup` returns `"Email already exists"` |
+| **`429 Too Many Requests`** | Rate limit exceeded | `authLimiter` (20 req/15 min) or `searchLimiter` (30 req/1 min) |
+| **`500 Internal Error`** | Unhandled server exception | DB connection failure, filesystem I/O error |
 
 ---
 
 ## 2. Endpoint Registry
 
 ### Authentication Domain (`/api/auth`)
-*Router*: [AuthRoutes.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/AuthRoutes.js) | *Controller*: [AuthController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/AuthController.js)
+*Router*: [AuthRoutes.js](../server/routes/AuthRoutes.js) | *Controller*: [AuthController.js](../server/controllers/AuthController.js)
 
-| Method | Endpoint | Auth Level | Rate Limit | Description |
+| Method | Endpoint | Auth Guard | Rate Limit | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/signup` | Public | 20 req / 15 min | Creates user account, hashes password with BCrypt, and sets 3-day JWT cookie. |
-| `POST` | `/api/auth/login` | Public | 20 req / 15 min | Verifies email and password, returning user data and setting JWT cookie. |
-| `GET` | `/api/auth/user-info` | `verifyToken` | Standard | Returns authenticated user profile, setup status, and avatar image. |
-| `POST` | `/api/auth/update-profile` | `verifyToken` | Standard | Updates first name, last name, avatar color, and sets `profileSetup: true`. |
-| `POST` | `/api/auth/add-profile-image` | `verifyToken` | Standard | Accepts multipart avatar image (max 5MB), saves to disk, updates user record. |
-| `DELETE` | `/api/auth/remove-profile-image`| `verifyToken` | Standard | Deletes avatar file from server disk and resets `user.image` to `null`. |
-| `POST` | `/api/auth/logout` | Public | Standard | Clears `jwt` cookie by sending expired cookie (`maxAge: 1`). |
+| `POST` | `/api/auth/signup` | None | `authLimiter` 20/15m | Creates user, hashes password via `pre("save")` bcrypt hook, sets `jwt` cookie. |
+| `POST` | `/api/auth/login` | None | `authLimiter` 20/15m | Verifies email exists, `bcrypt.compare` password, sets `jwt` cookie. |
+| `GET` | `/api/auth/user-info` | `verifyToken` | — | Returns profile for `req.userId`. Used by `App.jsx` on every page load to restore auth state. |
+| `POST` | `/api/auth/update-profile` | `verifyToken` | — | Updates `firstName`, `lastName`, `color`; sets `profileSetup: true`. |
+| `POST` | `/api/auth/add-profile-image` | `verifyToken` | — | Multer `upload.single("profile-image")` — field name is `profile-image`. Max 5MB. Saves to `uploads/profiles/`. |
+| `DELETE` | `/api/auth/remove-profile-image` | `verifyToken` | — | Calls `fs.access` then `fs.unlink` on `user.image` path; sets `user.image = null`. |
+| `POST` | `/api/auth/logout` | None | — | Sets `jwt` cookie with `maxAge: 1`, effectively expiring it immediately. |
 
 ### Contacts Domain (`/api/contacts`)
-*Router*: [ContactRoutes.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/ContactRoutes.js) | *Controller*: [ContactsController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ContactsController.js)
+*Router*: [ContactRoutes.js](../server/routes/ContactRoutes.js) | *Controller*: [ContactsController.js](../server/controllers/ContactsController.js)
 
-| Method | Endpoint | Auth Level | Rate Limit | Description |
+| Method | Endpoint | Auth Guard | Rate Limit | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/contacts/search` | `verifyToken` | 30 req / 1 min | Case-insensitive regex search by name or email, excluding requesting user. |
-| `GET` | `/api/contacts/get-contacts-for-dm` | `verifyToken` | Standard | Aggregates messages to return sorted contact list with recency timestamps. |
-| `GET` | `/api/contacts/get-all-contacts` | `verifyToken` | Standard | Returns all users formatted as `{ label, value }` for channel invitation pickers. |
+| `POST` | `/api/contacts/search` | `verifyToken` | `searchLimiter` 30/1m | Body: `{ searchTerm }`. Regex-escaped case-insensitive search on `firstName`, `lastName`, `email`. Excludes current user. |
+| `GET` | `/api/contacts/get-contacts-for-dm` | `verifyToken` | — | Returns sorted contact list with `lastMessageTime` via Messages aggregation pipeline. |
+| `GET` | `/api/contacts/get-all-contacts` | `verifyToken` | — | Returns `[{ label, value }]` array for channel member picker. `label` is `"firstName lastName"` or `email` if name not set. |
 
 ### Messages Domain (`/api/messages`)
-*Router*: [MessagesRoute.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/MessagesRoute.js) | *Controller*: [MessagesController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/MessagesController.js)
+*Router*: [MessagesRoute.js](../server/routes/MessagesRoute.js) | *Controller*: [MessagesController.js](../server/controllers/MessagesController.js)
 
-| Method | Endpoint | Auth Level | Rate Limit | Description |
+| Method | Endpoint | Auth Guard | Rate Limit | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/messages/get-messages` | `verifyToken` | Standard | Fetches historical direct messages between authenticated user and target ID. |
-| `POST` | `/api/messages/upload-file` | `verifyToken` | Standard | Accepts multipart file attachment (max 10MB), returns storage file path. |
+| `POST` | `/api/messages/get-messages` | `verifyToken` | — | Body: `{ id: recipientUserId }`. Returns all direct messages between `req.userId` and `id`, sorted by `timestamp` ascending. No pagination. |
+| `POST` | `/api/messages/upload-file` | `verifyToken` | — | Multer `upload.single("file")` — field name is `"file"`. Max 10MB. Returns `{ filePath: "uploads/files/<timestamp>/<originalname>" }`. |
 
 ### Channels Domain (`/api/channels`)
-*Router*: [ChannelRoutes.js](file:///home/rishab/Personal/WebDev/ChatX/server/routes/ChannelRoutes.js) | *Controller*: [ChannelController.js](file:///home/rishab/Personal/WebDev/ChatX/server/controllers/ChannelController.js)
+*Router*: [ChannelRoutes.js](../server/routes/ChannelRoutes.js) | *Controller*: [ChannelController.js](../server/controllers/ChannelController.js)
 
-| Method | Endpoint | Auth Level | Rate Limit | Description |
+| Method | Endpoint | Auth Guard | Rate Limit | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/channels/create-channel` | `verifyToken` | Standard | Creates channel document, verifies member existence, and designates admin. |
-| `GET` | `/api/channels/get-user-channels` | `verifyToken` | Standard | Retrieves all channels where user is either member or admin, sorted by activity. |
-| `GET` | `/api/channels/get-channel-messages/:channelId` | `verifyToken` | Standard | Returns channel messages with populated sender data, verifying user membership. |
+| `POST` | `/api/channels/create-channel` | `verifyToken` | — | Body: `{ nameOfChannel, members: [ObjectId] }`. Validates all member IDs exist. Sets `admin` to `req.userId`. Admin is NOT added to `members`. |
+| `GET` | `/api/channels/get-user-channels` | `verifyToken` | — | Returns channels where `admin === userId OR members includes userId`, sorted by `updatedAt` descending. |
+| `GET` | `/api/channels/get-channel-messages/:channelId` | `verifyToken` | — | Populates `channel.messages` with sender details. Checks `channel.members.some(m => m.toString() === req.userId) OR channel.admin.toString() === req.userId`. Returns 403 if neither. |
 
-### Health & Monitoring Domain
-*Router*: [index.js](file:///home/rishab/Personal/WebDev/ChatX/server/index.js#L78-L80)
+### Health Domain
+*Defined in*: [server/index.js L78–80](../server/index.js#L78-L80)
 
-| Method | Endpoint | Auth Level | Description |
+| Method | Endpoint | Auth Guard | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Public | Liveness probe returning server status and UTC timestamp. |
+| `GET` | `/health` | None | Returns `{ status: "ok", timestamp: ISO8601 }`. Does **not** check DB connectivity — this is a liveness probe only. |
 
 ---
 
@@ -106,10 +107,10 @@ ChatX standardizes error delivery across all RESTful API endpoints. All failure 
 
 ### Route 1: User Login (`POST /api/auth/login`)
 
-#### Request Specification
+#### Request
 ```http
 POST /api/auth/login HTTP/1.1
-Host: api.chatx.com
+Host: chatx-backend.onrender.com
 Content-Type: application/json
 Origin: https://chat-x-three-gamma.vercel.app
 
@@ -119,11 +120,11 @@ Origin: https://chat-x-three-gamma.vercel.app
 }
 ```
 
-#### Success Response (`200 OK`)
+#### Success (`200 OK`)
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-Set-Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Max-Age=259200; Path=/; Expires=Tue, 06 Oct 2026 04:57:19 GMT; HttpOnly; Secure; SameSite=None
+Set-Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Max-Age=259200; Path=/; Expires=Sun, 06 Oct 2026 04:57:19 GMT; HttpOnly; Secure; SameSite=None
 
 {
   "user": {
@@ -135,56 +136,35 @@ Set-Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Max-Age=259200; Path=/;
   }
 }
 ```
+> Note: `image` and `color` are **not** returned by `login`. Only `user-info` returns `image`. Login response matches exactly what `AuthController.login` returns at [L104–112](../server/controllers/AuthController.js#L104-L112).
 
-#### Failure Responses
-##### Scenario A: Missing Credentials (`400 Bad Request`)
-```json
-// Status: 400 Bad Request
-"Email and Password are required"
+#### Failure Responses (actual response bodies as sent by the controller)
 ```
-
-##### Scenario B: Invalid Credentials (`400 Bad Request`)
-```json
-// Status: 400 Bad Request
-"Password is not correct"
-```
-
-##### Scenario C: User Not Found (`404 Not Found`)
-```json
-// Status: 404 Not Found
-"User with the given email not found."
-```
-
-##### Scenario D: Rate Limit Exhaustion (`429 Too Many Requests`)
-```json
-// Status: 429 Too Many Requests
-{
-  "error": "Too many authentication attempts, please try again later."
-}
+400 — "Email and Password are required"     (missing field)
+400 — "Password is not correct"             (wrong password)
+404 — "User with the given email not found." (no account)
+429 — { "error": "Too many authentication attempts, please try again later." }
+500 — "Internal server error"
 ```
 
 ---
 
 ### Route 2: Retrieve Direct Messages (`POST /api/messages/get-messages`)
 
-#### Request Specification
+#### Request
 ```http
 POST /api/messages/get-messages HTTP/1.1
-Host: api.chatx.com
+Host: chatx-backend.onrender.com
 Content-Type: application/json
 Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Origin: https://chat-x-three-gamma.vercel.app
 
 {
   "id": "670c5f9d2f8a1e0087654321"
 }
 ```
 
-#### Success Response (`200 OK`)
-```http
-HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-
+#### Success (`200 OK`) — messages exist
+```json
 {
   "storedMessages": [
     {
@@ -192,7 +172,7 @@ Content-Type: application/json; charset=utf-8
       "sender": "670c5e7b2f8a1e0012345678",
       "recipient": "670c5f9d2f8a1e0087654321",
       "messageType": "text",
-      "content": "Hey Bob, are the deployment configs ready?",
+      "content": "Hey, are the deployment configs ready?",
       "timestamp": "2026-10-03T04:30:00.000Z",
       "__v": 0
     },
@@ -209,36 +189,30 @@ Content-Type: application/json; charset=utf-8
 }
 ```
 
+#### Success (`200 OK`) — no messages
+```json
+{ "messages": [] }
+```
+> Note: The response key differs depending on whether messages exist. When `storedMessages.length === 0`, the controller returns `{ messages: [] }`. When messages exist, it returns `{ storedMessages: [...] }`. This is an API inconsistency in [MessagesController.js L24–33](../server/controllers/MessagesController.js#L24-L33).
+
 #### Failure Responses
-##### Scenario A: Missing Recipient ID (`400 Bad Request`)
-```json
-// Status: 400 Bad Request
-"Both user IDs are required"
 ```
-
-##### Scenario B: Unauthenticated Request (`401 Unauthorized`)
-```json
-// Status: 401 Unauthorized
-"You are not authenticated, login or signup first!"
-```
-
-##### Scenario C: Cryptographically Invalid or Expired Token (`403 Forbidden`)
-```json
-// Status: 403 Forbidden
-"Token is not valid"
+400 — "Both user IDs are required"       (missing id in body)
+401 — "You are not authenticated, login or signup first!"
+403 — "Token is not valid"
+500 — "Could not fetch messages"
 ```
 
 ---
 
-### Route 3: Create Collaborative Channel (`POST /api/channels/create-channel`)
+### Route 3: Create Channel (`POST /api/channels/create-channel`)
 
-#### Request Specification
+#### Request
 ```http
 POST /api/channels/create-channel HTTP/1.1
-Host: api.chatx.com
+Host: chatx-backend.onrender.com
 Content-Type: application/json
 Cookie: jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-Origin: https://chat-x-three-gamma.vercel.app
 
 {
   "nameOfChannel": "platform-engineering",
@@ -249,11 +223,8 @@ Origin: https://chat-x-three-gamma.vercel.app
 }
 ```
 
-#### Success Response (`201 Created`)
-```http
-HTTP/1.1 201 Created
-Content-Type: application/json; charset=utf-8
-
+#### Success (`201 Created`)
+```json
 {
   "channel": {
     "_id": "670c62002f8a1e0011223344",
@@ -270,40 +241,38 @@ Content-Type: application/json; charset=utf-8
   }
 }
 ```
+> Note: The `admin` (`req.userId`) is **not** included in the `members` array. The admin is a separate field. Channel message broadcasts explicitly loop `members` and then separately notify `admin` ([socket.js L136–156](../server/socket.js#L136-L156)).
 
 #### Failure Responses
-##### Scenario A: Non-Existent Member IDs Passed (`400 Bad Request`)
-```json
-// Status: 400 Bad Request
-"Some users are not valid users"
 ```
-
-##### Scenario B: Missing Authentication Cookie (`401 Unauthorized`)
-```json
-// Status: 401 Unauthorized
-"You are not authenticated, login or signup first!"
+400 — "admin user not found"           (req.userId not in DB — should not occur with valid JWT)
+400 — "Some users are not valid users"  (one or more member IDs do not exist)
+401 — "You are not authenticated, login or signup first!"
+500 — "Could not create channel"
 ```
 
 ---
 
 ## 4. Real-Time WebSocket Event Contract
 
-*Engine*: [socket.js](file:///home/rishab/Personal/WebDev/ChatX/server/socket.js)
+*Engine*: [socket.js](../server/socket.js) | Socket.IO v4.8.1
 
-### Event: `sendMessage` (Client -> Server)
-Transmitted when a user dispatches a direct message.
+### Authentication
+All socket connections must pass JWT verification in `io.use()`. The JWT is extracted from `socket.handshake.headers.cookie` by splitting on `";"` and finding the `"jwt="` prefix. Connections without a valid token are rejected before `io.on("connection")` fires.
 
+### Event: `sendMessage` (Client → Server)
 ```json
 {
   "recipient": "670c5f9d2f8a1e0087654321",
-  "content": "Reviewing the pull request now.",
+  "content": "Reviewing the PR now.",
   "messageType": "text",
-  "fileUrl": undefined
+  "fileUrl": null
 }
 ```
+> The `sender` field is **ignored if provided by the client**. It is always overwritten with `socket.userId` server-side.
 
-### Event: `recieveMessage` (Server -> Client)
-Pushed by the server to both recipient and sender sockets.
+### Event: `recieveMessage` (Server → Client, both sender and recipient)
+> Note: The event name contains a typo — `"recieveMessage"` (not `"receiveMessage"`). This is intentional in the codebase and must be matched exactly on the client.
 
 ```json
 {
@@ -325,25 +294,25 @@ Pushed by the server to both recipient and sender sockets.
     "color": 0
   },
   "messageType": "text",
-  "content": "Reviewing the pull request now.",
+  "content": "Reviewing the PR now.",
+  "fileUrl": null,
   "timestamp": "2026-10-03T04:56:10.000Z"
 }
 ```
+> Sender and recipient are populated with `"id email firstName lastName image color"` — Mongoose's virtual `id` field (not `_id`).
 
-### Event: `send-channel-message` (Client -> Server)
-Transmitted when posting inside a group channel.
-
+### Event: `send-channel-message` (Client → Server)
 ```json
 {
   "channelId": "670c62002f8a1e0011223344",
-  "content": "Release v1.2.0 deployed to staging.",
+  "content": "v1.2.0 deployed to staging.",
   "messageType": "text",
   "fileUrl": null
 }
 ```
 
-### Event: `recieve-channel-message` (Server -> Client)
-Broadcast to all connected members and the channel administrator.
+### Event: `recieve-channel-message` (Server → Client, all members + admin)
+> Note: Also contains the same `"recieve"` typo. Broadcast to all `channel.members` socket IDs **and** separately to `channel.admin` socket ID.
 
 ```json
 {
@@ -359,8 +328,9 @@ Broadcast to all connected members and the channel administrator.
   },
   "recipient": null,
   "messageType": "text",
-  "content": "Release v1.2.0 deployed to staging.",
+  "content": "v1.2.0 deployed to staging.",
   "fileUrl": null,
   "timestamp": "2026-10-03T04:57:00.000Z"
 }
 ```
+> **Inconsistency**: `recieveMessage` (DM) populates sender with `id` (virtual field). `recieve-channel-message` populates sender with `_id` (actual BSON field) because the select string in socket.js for DMs is `"id email firstName lastName image color"` while for channel messages it is also `"id email firstName lastName image color"` — however the spread `{ ...messageData._doc, channelId }` re-serializes the raw `_doc` which exposes `_id` instead of the virtual `id`. This is an API inconsistency between the two event payloads.

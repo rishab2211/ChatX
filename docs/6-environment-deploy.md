@@ -2,17 +2,17 @@
 
 ## 1. Environment Variable Matrix
 
-The application's runtime configuration is managed through decoupled environment variables for both backend and frontend tiers, based on [server/.env.example](file:///home/rishab/Personal/WebDev/ChatX/server/.env.example) and [client/.env.example](file:///home/rishab/Personal/WebDev/ChatX/client/.env.example).
+The application's runtime configuration is managed through decoupled environment variables for both backend and frontend tiers, based on [server/.env.example](../server/.env.example) and [client/.env.example](../client/.env.example).
 
 ### Backend Server (`/server/.env`)
-Validated at startup in [server/index.js](file:///home/rishab/Personal/WebDev/ChatX/server/index.js#L18-L24). If any required variable is omitted, the process exits immediately with code `1`.
+Validated at startup in [server/index.js](../server/index.js#L18-L24). If any required variable (`PORT`, `JWT_KEY`, `ORIGIN`, `DB_URL`) is omitted or empty, the process logs an error and exits immediately with code `1`.
 
 | Variable Name | Environment | Purpose / Description | Safe Dummy Value | Is Secret? | Production Guidelines |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `PORT` | Server | Network port on which the Express HTTP server and Socket.IO engine bind. | `3000` | No | In cloud environments (Render, Railway, Heroku), this is injected dynamically by the PaaS via `$PORT`. |
 | `JWT_KEY` | Server | Secret cryptographic key used to sign and verify HMAC-SHA256 stateless session tokens. | `"dev_super_secret_jwt_key_min_32_chars_12345"` | **YES** | Must be generated with high entropy (e.g. `openssl rand -base64 32`). Must never be committed to source control. |
 | `ORIGIN` | Server | Allowed client origin for CORS whitelisting and Socket.IO handshake origin checks. | `"http://localhost:5173"` | No | Set to the exact production frontend URL (e.g. `"https://chat-x-three-gamma.vercel.app"`). Do not include trailing slashes. |
-| `DB_URL` | Server | MongoDB Atlas or local MongoDB connection URI with credentials and replica set parameters. | `"mongodb://127.0.0.1:27017/chatx"` | **YES** | In production, use MongoDB Atlas connection string with TLS and retry parameters: `mongodb+srv://<user>:<pwd>@cluster0.mongodb.net/chatx?retryWrites=true&w=majority`. |
+| `DB_URL` | Server | MongoDB Atlas or local MongoDB connection URI with credentials and replica set parameters. | `"mongodb://127.0.0.1:27017/chatx"` | **YES** | In production, use MongoDB Atlas connection string with TLS and retry parameters: `mongodb+srv://<username>:<password>@cluster0.mongodb.net/chatx?retryWrites=true&w=majority`. |
 
 ### Frontend Client (`/client/.env`)
 Bundled at compile-time via Vite. All variables intended for client consumption must carry the `VITE_` prefix.
@@ -31,7 +31,7 @@ Follow these exact CLI instructions to configure, initialize, and execute the en
 - **Node.js**: v18.x or v20.x LTS ([Download](https://nodejs.org/))
 - **npm**: v9.x or v10.x
 - **Git**: Installed and authenticated
-- **MongoDB**: Local MongoDB instance (`mongod`) running on port `27017` OR a free MongoDB Atlas connection string.
+- **MongoDB**: Local MongoDB instance (`mongod`) running on port `27017` OR a MongoDB Atlas connection string.
 
 ### Step-by-Step CLI Execution
 
@@ -122,12 +122,12 @@ graph TD
     end
 
     subgraph Atlas ["Database: MongoDB Atlas"]
-        MongoCluster[("M10+ Multi-AZ Replica Set<br/>Automated Backups & Monitoring")]
+        MongoCluster[("M10+ Multi-AZ Replica Set<br/>Automated Backups and Monitoring")]
     end
 
     ClientBrowser -->|"HTTPS (Static Assets)"| VercelEdge
     VercelEdge --> SPA
-    ClientBrowser -->|"HTTPS (REST) & WSS (Socket.IO)"| NginxProxy
+    ClientBrowser -->|"HTTPS (REST) and WSS (Socket.IO)"| NginxProxy
     NginxProxy --> NodeCluster
     NodeCluster --> LocalVol
     NodeCluster -->|"Mongoose TLS Connection"| MongoCluster
@@ -137,7 +137,7 @@ graph TD
 - **Repository Root**: `/client`
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist`
-- **SPA Routing Rewrite**: Configured in [client/vercel.json](file:///home/rishab/Personal/WebDev/ChatX/client/vercel.json) to route all paths to `index.html`:
+- **SPA Routing Rewrite**: Configured in [client/vercel.json](../client/vercel.json) to route all paths to `index.html`:
   ```json
   {
     "rewrites": [
@@ -148,13 +148,14 @@ graph TD
     ]
   }
   ```
-- **Environment Variables**: Configure `VITE_SERVER_URL` in the Vercel Project Settings to match the backend production URL.
+- **Environment Variables**: Configure `VITE_SERVER_URL` in the Vercel Project Settings to match the backend production URL (e.g. `https://api.chatx.com` or Render service URL).
 
 ### 2. Backend: Render / Railway / AWS ECS
 - **Repository Root**: `/server`
 - **Build Command**: `npm install`
 - **Start Command**: `npm start` (`node index.js`)
-- **Persistent Volume Mount**: For single-instance container deployments, mount a persistent volume at `/app/uploads` to preserve avatars and chat files across container redeployments.
+- **Persistent Volume Mount**: For single-instance container deployments, mount a persistent volume at `/app/uploads` (or configure persistent disk) to preserve avatars (`uploads/profiles`) and chat files (`uploads/files`) across container restarts and redeployments.
+- **Cross-Domain Cookie Configuration**: When deploying the client on Vercel (`*.vercel.app`) and the server on Render (`*.onrender.com`), cookie transmission requires `sameSite: "None"` and `secure: true` in [AuthController.js](../server/controllers/AuthController.js#L44-L49). Both domains must use `HTTPS`.
 
 ### 3. Reverse Proxy & WebSocket Configuration (Nginx Reference)
 When deploying behind a self-hosted Nginx or cloud reverse proxy, the following configuration ensures proper HTTP/1.1 WebSocket upgrading and cookie propagation:
@@ -214,7 +215,7 @@ server {
 To enable orchestration platforms (Kubernetes, AWS ECS, Docker Swarm, Render) to perform automated container restarts and traffic routing, ChatX specifies distinct liveness and readiness probes.
 
 ### 1. Existing Liveness Probe: `GET /health`
-- **Location**: [server/index.js](file:///home/rishab/Personal/WebDev/ChatX/server/index.js#L78-L80)
+- **Location**: [server/index.js](../server/index.js#L78-L80)
 - **Purpose**: Verifies that the Node.js process is executing and capable of responding to HTTP requests.
 - **Response**:
   ```json
